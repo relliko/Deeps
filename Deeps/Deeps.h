@@ -48,6 +48,7 @@ enum SPECEFFECT
  * @brief Required includes for an extension.
  */
 #include "C:\Ashita 3\plugins\ADK\Ashita.h"
+#include <list>
 #include <map>
 #include <functional>
 #include <stdint.h>
@@ -166,6 +167,7 @@ class Deeps : IPlugin
 	ILogManager*		m_LogManager;
 	DWORD               m_PluginId;
 	IDirect3DDevice8*   m_Direct3DDevice;
+	std::list<void*>	m_Packets;
 
 private:
     source_t* getDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID);

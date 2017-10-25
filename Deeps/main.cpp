@@ -159,6 +159,11 @@ bool Deeps::Initialize(IAshitaCore* core, ILogManager* log, uint32_t id)
  */
 void Deeps::Release(void)
 {
+	while (m_Packets.size() > 0)
+	{
+		free(*m_Packets.begin());
+		m_Packets.pop_front();
+	}
 }
 
 /**
@@ -296,6 +301,24 @@ bool Deeps::HandleIncomingText(int16_t mode, const char* message, int16_t* modif
  */
 bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, void* data, void* modified, bool blocked)
 {
+	for (std::list<void*>::iterator it = m_Packets.begin(); it != m_Packets.end(); it++)
+	{
+		if (memcmp(data, (*it), size) == 0)
+		{
+			return false;
+		}
+	}
+
+	void* packet = malloc(1024);
+	memset(packet, 0, 1024);
+	memcpy(packet, data, size);
+	m_Packets.push_back(packet);
+	while (m_Packets.size() > 200)
+	{
+		free(*m_Packets.begin());
+		m_Packets.pop_front();
+	}
+
     if (id == 0x28) //action
     {
         uint8_t actionNum = (uint8_t)(unpackBitsBE((unsigned char*)data, 182, 4));
@@ -353,7 +376,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, void* data, void* m
                     {
                         uint8_t reaction = (uint8_t)(unpackBitsBE((unsigned char*)data, startBit + 36, 5));
                         uint16_t animation = (uint16_t)(unpackBitsBE((unsigned char*)data, startBit + 41, 12));
-                        uint32_t mainDamage = (uint16_t)(unpackBitsBE((unsigned char*)data, startBit + 63, 17));
+                        uint32_t mainDamage = (uint32_t)(unpackBitsBE((unsigned char*)data, startBit + 63, 17));
                         uint8_t speceffect = (uint8_t)(unpackBitsBE((unsigned char*)data, startBit + 53, 9));
 
                         if (m_debug)
