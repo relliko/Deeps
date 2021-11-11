@@ -47,7 +47,7 @@ enum SPECEFFECT
 /**
  * @brief Required includes for an extension.
  */
-#include "C:\Ashita 3\plugins\ADK\Ashita.h"
+#include "G:\Code\git.ashita.atom0s.com\Ashita v3\Ashita-src\build\plugins\ADK\Ashita.h"
 #include <list>
 #include <map>
 #include <functional>
