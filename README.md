@@ -8,6 +8,14 @@ Forked from https://git.ashitaxi.com/Plugins/Deeps
 - Type /load deeps in game
 
 
+## Usage
+You can type /dps or /deeps to show the available commands. 
+
+Left clicking on a bar will show additional details about the damage dealt, right click to go back.
+
+Shift clicking the background will allow you to reposition the window.
+
+
 ## New features
 - Static colors for job bars
 - Damage from outside of party or alliance is now filtered out.
