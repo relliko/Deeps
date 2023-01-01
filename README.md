@@ -16,10 +16,14 @@ Left clicking on a bar will show additional details about the damage dealt, righ
 Shift clicking the background will allow you to reposition the window.
 
 
-## New features
+## New features 
 - Static colors for job bars
 - Damage from outside of party or alliance is now filtered out.
 - Overall hit rating displayed alongside damage done
+
+
+## Known issues
+- Sometimes clicking the GUI can cause client crashes, recommended to avoid doing it during important encounters.
 
 
 ## TODO
