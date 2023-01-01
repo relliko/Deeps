@@ -129,6 +129,11 @@ const char* Deeps::GetName(void) const
     return "Deeps";
 }
 
+double Deeps::GetVersion(void) const
+{
+    return 1.01f;
+}
+
 /**
  * @brief Gets the author of the plugin.
  *
