@@ -4,7 +4,7 @@ Credit to kjLotus for the original version of Deeps that was the basis for this 
 Forked from https://git.ashitaxi.com/Plugins/Deeps
 
 ## Installation
-- Download and extract the ```plugins``` and ```resources``` directories from the [latest release](https://github.com/relliko/Deeps/releases/latest) zip directly into your base Ashita v4 directory.
+- Download and extract the ```plugins``` and ```resources``` directories from the [latest release zip](https://github.com/relliko/Deeps/releases/latest) directly into your base Ashita v4 directory.
 - Type /load deeps in game
 
 
