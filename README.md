@@ -29,6 +29,7 @@ Shift clicking the background will allow you to reposition the window.
 
 
 ## TODO
+- Add hit % to the report function
 - Need to assign colors to some newer jobs
 - Toggle to display damage from people outside of party/alliances
 - Include pet damage
