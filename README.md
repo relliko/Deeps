@@ -12,3 +12,4 @@ Forked from https://git.ashitaxi.com/Plugins/Deeps
 ## TODO
 - Need to assign colors to some newer jobs
 - Toggle to display damage from people outside of party/alliances
+- Include pet damage
