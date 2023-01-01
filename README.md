@@ -7,7 +7,7 @@ Forked from https://git.ashitaxi.com/Plugins/Deeps
 - Download and extract the ```plugins``` and ```resources``` directories from the [latest release zip](https://github.com/relliko/Deeps/releases/latest) directly into your base Ashita v4 directory.
 - Type /load deeps in game
 
-Note: The only necessarily required file is ```plugins/Deeps.dll```; if you don't like the bar texture you can leave out the resources folder and just have flat colored bars and the plugin will still work.
+Note: The only necessarily required file is ```plugins/Deeps.dll```; if you don't like the bar texture you can leave out the resources folder and just have flat colored bars and the plugin will still work, although some jobs may have text that is difficult to read.
 
 
 ## Usage
