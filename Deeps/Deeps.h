@@ -47,12 +47,13 @@ enum SPECEFFECT
 /**
  * @brief Required includes for an extension.
  */
-#include "G:\Code\git.ashita.atom0s.com\Ashita v3\Ashita-src\build\plugins\ADK\Ashita.h"
+#include "C:\code\Ashita-v4beta\plugins\sdk\Ashita.h"
 #include <list>
 #include <map>
 #include <functional>
 #include <stdint.h>
 
+// holds details about a specific damage source
 struct damage_t
 {
     uint64_t total;
@@ -77,6 +78,7 @@ struct damage_t
     }
 };
 
+// Container for an attack that tracks hit, miss, crit, evade, parry as damage types
 struct source_t
 {
     std::string name;
@@ -96,6 +98,29 @@ struct source_t
         }
         return tot;
     }
+    // Return the total number of times this damage source was used
+    uint64_t getCount() const
+    {
+        uint64_t count = 0;
+        for (auto d : damage)
+        {
+            count += d.second.count;
+        }
+        return count;
+    }
+    // Return the count if this damage source is "Miss", otherwise return 0
+    uint64_t getMissed() const
+    {
+        uint64_t missed = 0;
+        for (auto d : damage)
+        {
+            if (d.first == "Miss")
+            {
+                missed = d.second.count;
+            }
+        }
+        return missed;
+    }
 
     bool operator > (const source_t& o) const
     {
@@ -105,10 +130,11 @@ struct source_t
 
 struct entitysources_t
 {
-    std::string name;
-    uint32_t color;
+    std::string name; // Player name
+    uint32_t color; // A player's bar color
     std::map<uint32_t, source_t> sources;
 
+    // Returns total damage dealt
     uint64_t total() const
     {
         int64_t total = 0;
@@ -117,6 +143,19 @@ struct entitysources_t
             total += s.second.total();
         }
         return total;
+    }
+
+    // Returns overall hitrate as a percentage
+    float hitrate() const
+    {
+        uint64_t totalCount = 0;
+        uint64_t totalMiss = 0;
+        for (auto s : sources)
+        {
+            totalCount += s.second.getCount();
+            totalMiss += s.second.getMissed();
+        }
+        return 100*((float)(totalCount - totalMiss)/(float)totalCount);
     }
     bool operator == (const entitysources_t& o) const
     {
@@ -138,19 +177,38 @@ static const std::vector<uint16_t> missMessages = { 15, 85, 158, 188, 245, 284, 
 static const std::vector<uint16_t> evadeMessages = { 14, 30, 31, 32, 33, 189, 248, 282, 283, 323, 355 };
 static const std::vector<uint16_t> parryMessages = { 69, 70 };
 
-static const std::vector<D3DCOLOR> Colors = { D3DCOLOR_ARGB(255, 12, 0, 155), D3DCOLOR_ARGB(255, 140, 0, 0), D3DCOLOR_ARGB(255, 255, 177, 32), D3DCOLOR_ARGB(255, 143, 143, 143),
-                                              D3DCOLOR_ARGB(255, 68, 68, 68), D3DCOLOR_ARGB(255, 255, 0, 0), D3DCOLOR_ARGB(255, 0, 164, 49), D3DCOLOR_ARGB(255, 198, 198, 0),
-                                              D3DCOLOR_ARGB(255, 116, 0, 145), D3DCOLOR_ARGB(255, 165, 153, 10), D3DCOLOR_ARGB(255, 184, 128, 10), D3DCOLOR_ARGB(255, 224, 0, 230),
-                                              D3DCOLOR_ARGB(255, 234, 100, 0), D3DCOLOR_ARGB(255, 119, 0, 0), D3DCOLOR_ARGB(255, 130, 17, 255), D3DCOLOR_ARGB(255, 79, 196, 0),
-                                              D3DCOLOR_ARGB(255, 0, 16, 217), D3DCOLOR_ARGB(255, 136, 68, 0), D3DCOLOR_ARGB(255, 244, 98, 0), D3DCOLOR_ARGB(255, 15, 190, 220),
-                                              D3DCOLOR_ARGB(255, 0, 123, 145) };
 
-void g_onClick(int, void*, float, float);
+static const std::vector<D3DCOLOR> Colors = {
+        D3DCOLOR_ARGB(0xFF, 0xFF, 0x00, 0x00), // WAR: Red
+        D3DCOLOR_ARGB(0xFF, 0xFF, 0x8C, 0x00), // MNK: Dark orange
+        D3DCOLOR_ARGB(0xFF, 0xFF, 0xFF, 0xFF), // WHM: White
+        D3DCOLOR_ARGB(0xFF, 0x4B, 0x00, 0x82), // BLM: Indigo
+        D3DCOLOR_ARGB(0xFF, 0xFF, 0x69, 0xB4), // RDM: Pink
+        D3DCOLOR_ARGB(0xFF, 0x22, 0x8B, 0x22), // THF: Forest green
+        D3DCOLOR_ARGB(0xFF, 0xD3, 0xD3, 0xD3), // PLD: Light grey
+        D3DCOLOR_ARGB(0xFF, 0x00, 0x00, 0x00), // DRK: Black
+        D3DCOLOR_ARGB(0xFF, 0x8B, 0x45, 0x13), // BST: Saddle brown
+        D3DCOLOR_ARGB(0xFF, 0xFF, 0xFF, 0x00), // BRD: Yellow
+        D3DCOLOR_ARGB(0xFF, 0xAD, 0xFF, 0x2F), // RNG: Green yellow
+        D3DCOLOR_ARGB(0xFF, 0x80, 0x00, 0x00), // SAM: Maroon
+        D3DCOLOR_ARGB(0xFF, 0x70, 0x80, 0x90), // NIN: Slate grey
+        D3DCOLOR_ARGB(0xFF, 0x93, 0x70, 0xDB), // DRG: Medium purple
+        D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0xFF), // SMN: Cyan
+        D3DCOLOR_ARGB(0xFF, 0x41, 0x69, 0xE1), // BLU: Royal blue
+        D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // COR PLACEHOLDER
+        D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // PUP PLACEHOLDER
+        D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // DNC PLACEHOLDER
+        D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // SCH PLACEHOLDER
+        D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // GEO PLACEHOLDER
+        D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00)  // RUN PLACEHOLDER
+    };
+
+void g_onClick(Ashita::MouseEvent, void*, int32_t, int32_t);
 
 /**
  * @brief Global copy of our plugin data.
  */
-plugininfo_t* g_PluginInfo = NULL;
+IPluginBase* g_PluginInfo = NULL;
 
 /**
  * @brief Our Main Plugin Class
@@ -163,17 +221,19 @@ class Deeps : IPlugin
     /**
      * @brief Internal class variables.
      */
-	IAshitaCore*        m_AshitaCore;
-	ILogManager*		m_LogManager;
-	DWORD               m_PluginId;
-	IDirect3DDevice8*   m_Direct3DDevice;
-	std::list<void*>	m_Packets;
+	IAshitaCore*          m_AshitaCore;
+	ILogManager* 	      m_LogManager;
+	DWORD                 m_PluginId;
+	IDirect3DDevice8*     m_Direct3DDevice;
+	std::list<void*>	  m_Packets;
+    std::clock_t          m_LastRender;
 
 private:
     source_t* getDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID);
     bool updateDamageSource(source_t* source, uint16_t message, uint32_t damage);
     void repairBars(IFontObject* deepsBase, uint8_t size);
     void report(char mode, int max);
+    void Direct3DRelease(void);
     uint16_t getIndex(std::function<bool(IEntity*, int)>);
     uint32_t m_charInfo;
     std::string m_sourceInfo;
@@ -187,25 +247,25 @@ public:
     Deeps(void);
     virtual ~Deeps(void);
 
-    /**
-     * @brief GetPluginData implementation.
-     */
-	plugininfo_t GetPluginInfo(void);
 
     /**
      * @brief PluginBase virtual overrides.
      */
+    uint32_t GetFlags(void) const;
+    const char* GetName(void) const;
+    const char* GetAuthor(void) const;
+    const char* GetDescription(void) const;
     bool Initialize(IAshitaCore* core, ILogManager* log, uint32_t id);
     void Release(void);
-    bool HandleCommand(const char* command, int32_t type);
-	bool HandleIncomingText(int16_t mode, const char* message, int16_t* modifiedMode, char* modifiedMessage, bool blocked);
-	bool HandleIncomingPacket(uint16_t id, uint32_t size, void* data, void* modified, bool blocked);
-	bool HandleOutgoingPacket(uint16_t id, uint32_t size, void* data, void* modified, bool blocked);
+    bool HandleCommand(int32_t mode, const char* command, bool injected);
+	bool HandleIncomingText(int32_t mode, bool indent, const char* message, int32_t* modifiedMode, bool* modifiedIndent, char* modifiedMessage, bool injected, bool blocked);
+	bool HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk, const uint8_t* dataChunk, bool injected, bool blocked);
+	bool HandleOutgoingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk, const uint8_t* dataChunk, bool injected, bool blocked);
     bool Direct3DInitialize(IDirect3DDevice8* device);
-    void Direct3DRelease(void);
-    void Direct3DPreRender(void);
-    void Direct3DRender(void);
-    void onClick(int, IFontObject*, float, float);
+    //void Direct3DEndScene(bool isRenderingBackBuffer);
+    //void Direct3DBeginScene(bool isRenderingBackBuffer);
+    void Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion);
+    void onClick(Ashita::MouseEvent, IFontObject*, int32_t, int32_t);
 };
 
 // Global pointer to this
@@ -215,8 +275,7 @@ Deeps* g_Deeps = NULL;
 /**
  * @brief Required Plugin Exports
  */
-__declspec(dllexport) double     __stdcall GetInterfaceVersion(void);
-__declspec(dllexport) void       __stdcall CreatePluginInfo(plugininfo_t* lpBuffer);
-__declspec(dllexport) IPlugin*   __stdcall CreatePlugin(void);
+__declspec(dllexport) double     __stdcall expGetInterfaceVersion(void);
+__declspec(dllexport) IPlugin*   __stdcall expCreatePlugin(const char* args);
 
 #endif // __ASHITA_Deeps_H_INCLUDED__

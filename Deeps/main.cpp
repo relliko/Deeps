@@ -91,7 +91,7 @@ uint16_t Deeps::getIndex(std::function<bool(IEntity*, int)> func)
 {
     for (int i = 0; i < 2048; i++)
     {
-        if (func(m_AshitaCore->GetDataManager()->GetEntity(), i))
+        if (func(m_AshitaCore->GetMemoryManager()->GetEntity(), i))
         {
             return i;
         }
@@ -111,13 +111,42 @@ Deeps::~Deeps(void)
 { }
 
 /**
- * @brief Obtains the plugin data for this plugin.
+ * @brief Gets the PluginFlags this plugin uses.
  *
- * @return The PluginData structure for this plugin.
  */
-plugininfo_t Deeps::GetPluginInfo(void)
+uint32_t Deeps::GetFlags(void) const
 {
-    return (*g_PluginInfo);
+    return (uint32_t)Ashita::PluginFlags::LegacyDirect3D;
+}
+
+/**
+ * @brief Gets the name of the plugin.
+ *
+ * @return const char* The name of the plugin
+ */
+const char* Deeps::GetName(void) const
+{
+    return "Deeps";
+}
+
+/**
+ * @brief Gets the author of the plugin.
+ *
+ * @return const char* The authors name.
+ */
+const char* Deeps::GetAuthor(void) const
+{
+    return "Relliko, kjLotus";
+}
+
+/**
+ * @brief Gets the plugin description.
+ *
+ * @return const char* Plugin description.
+ */
+const char* Deeps::GetDescription(void) const
+{
+    return "Damage meters for Ashita v4.";
 }
 
 /**
@@ -143,8 +172,9 @@ bool Deeps::Initialize(IAshitaCore* core, ILogManager* log, uint32_t id)
 
     m_charInfo = 0;
     m_bars = 0;
+    m_LastRender = std::clock();
 
-	m_AshitaCore->GetConfigurationManager()->Load("Deeps", "Deeps.xml");
+	m_AshitaCore->GetConfigurationManager()->Load("Deeps", "Deeps");
 
     return true;
 }
@@ -159,6 +189,8 @@ bool Deeps::Initialize(IAshitaCore* core, ILogManager* log, uint32_t id)
  */
 void Deeps::Release(void)
 {
+    Deeps::Direct3DRelease();
+
 	while (m_Packets.size() > 0)
 	{
 		free(*m_Packets.begin());
@@ -174,7 +206,7 @@ void Deeps::Release(void)
  *
  * @return True on handled, false otherwise.
  */
-bool Deeps::HandleCommand(const char* command, int32_t type)
+bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
 {
     std::vector<std::string> args;
     auto count = Ashita::Commands::GetCommandArgs(command, &args);
@@ -222,16 +254,16 @@ bool Deeps::HandleCommand(const char* command, int32_t type)
                 m_debug = !m_debug;
                 if (m_debug)
                 {
-                    m_AshitaCore->GetChatManager()->AddChatMessage(5, "Deeps: Debug on");
+                    m_AshitaCore->GetChatManager()->AddChatMessage(5, FALSE, "Deeps: Debug on");
                 }
                 else
                 {
-                    m_AshitaCore->GetChatManager()->AddChatMessage(5, "Deeps: Debug off");
+                    m_AshitaCore->GetChatManager()->AddChatMessage(5, FALSE, "Deeps: Debug off");
                 }
                 return true;
             }
         }
-        m_AshitaCore->GetChatManager()->AddChatMessage(5, "Deeps usage: /dps reset, /dps report [s/p/l] [#]");
+        m_AshitaCore->GetChatManager()->AddChatMessage(1, FALSE, "Deeps usage: /dps reset, /dps report [s/p/l] [#]");
         return true;
     }
     return false;
@@ -250,7 +282,7 @@ void Deeps::report(char mode, int max)
             line.append(buff);
         }
         line.append(deepsBase->GetText());
-		m_AshitaCore->GetChatManager()->QueueCommand(line.c_str(), (int32_t)Ashita::CommandInputType::Typed);
+		m_AshitaCore->GetChatManager()->QueueCommand(1, line.c_str());
         for (int i = 0; i < m_bars; i++)
         {
             if (i > max)
@@ -269,7 +301,7 @@ void Deeps::report(char mode, int max)
             sprintf_s(name, 32, "DeepsBar%d", i);
             IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
             line.append(bar->GetText());
-            m_AshitaCore->GetChatManager()->QueueCommand(line.c_str(), (int32_t)Ashita::CommandInputType::Typed);
+            m_AshitaCore->GetChatManager()->QueueCommand(1, line.c_str());
         }
     }
 }
@@ -282,7 +314,7 @@ void Deeps::report(char mode, int max)
  *
  * @return True on handled, false otherwise.
  */
-bool Deeps::HandleIncomingText(int16_t mode, const char* message, int16_t* modifiedMode, char* modifiedMessage, bool blocked)
+bool Deeps::HandleIncomingText(int32_t mode, bool indent, const char* message, int32_t* modifiedMode, bool* modifiedIndent, char* modifiedMessage, bool injected, bool blocked)
 {
     return false;
 }
@@ -299,7 +331,7 @@ bool Deeps::HandleIncomingText(int16_t mode, const char* message, int16_t* modif
  * @note    Returning true on this will block the packet from being handled! This can
  *          have undesired effects! Use with caution as this can get you banned!
  */
-bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, void* data, void* modified, bool blocked)
+bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk, const uint8_t* dataChunk, bool injected, bool blocked)
 {
 	for (std::list<void*>::iterator it = m_Packets.begin(); it != m_Packets.end(); it++)
 	{
@@ -346,10 +378,18 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, void* data, void* m
             uint16_t index = getIndex([&](IEntity* entities, int i){if (entities->GetServerId(i) == userID) return true; return false; });
             if (index != 0)
             {
-                entitysources_t newInfo;
-                newInfo.name = m_AshitaCore->GetDataManager()->GetEntity()->GetName(index);
-                newInfo.color = Colors[rand() % Colors.size()];
-                entityInfo = &entities.insert(std::make_pair(userID, newInfo)).first->second;
+                // Only care to track party/alliance members
+                IParty* party = m_AshitaCore->GetMemoryManager()->GetParty();
+                for(auto i = 0; i < 18; i++)
+                {
+                    if (party->GetMemberServerId(i) == userID)
+                    {
+                        entitysources_t newInfo;
+                        newInfo.name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(index);
+                        newInfo.color = Colors[party->GetMemberMainJob(i)-1];
+                        entityInfo = &entities.insert(std::make_pair(userID, newInfo)).first->second;
+                    }
+                }
             }
         }
 
@@ -357,7 +397,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, void* data, void* m
         {
             if (m_debug)
             {
-                m_AshitaCore->GetChatManager()->Writef("Action Type: %d Action ID: %d", actionType, actionID);
+                m_AshitaCore->GetChatManager()->Writef(-3, false, "Action Type: %d Action ID: %d", actionType, actionID);
             }
 
             if ((actionType >= 1 && actionType <= 4) || (actionType == 6) || (actionType == 11) || (actionType == 14) || (actionType == 15))
@@ -381,8 +421,8 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, void* data, void* m
 
                         if (m_debug)
                         {
-                            m_AshitaCore->GetChatManager()->Writef("Reaction: %d Animation: %d", reaction, animation);
-                            m_AshitaCore->GetChatManager()->Writef("Speceffect: %d Param: %d", speceffect, mainDamage);
+                            m_AshitaCore->GetChatManager()->Writef(-3, false, "Reaction: %d Animation: %d", reaction, animation);
+                            m_AshitaCore->GetChatManager()->Writef(-3, false, "Speceffect: %d Param: %d", speceffect, mainDamage);
                         }
 
                         //Daken (ranged attack on attack)
@@ -455,7 +495,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, void* data, void* m
  * @note    Returning true on this will block the packet from being handled! This can
  *          have undesired effects! Use with caution as this can get you banned!
  */
-bool Deeps::HandleOutgoingPacket(uint16_t id, uint32_t size, void* data, void* modified, bool blocked)
+bool Deeps::HandleOutgoingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk, const uint8_t* dataChunk, bool injected, bool blocked)
 {
     return false;
 }
@@ -474,24 +514,27 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
 {
     this->m_Direct3DDevice = device;
 
-	float xpos = m_AshitaCore->GetConfigurationManager()->get_float("Deeps", "xpos", 300.0f);
-	float ypos = m_AshitaCore->GetConfigurationManager()->get_float("Deeps", "ypos", 300.0f);
+	float xpos = m_AshitaCore->GetConfigurationManager()->GetFloat("Deeps", "guipos", "xpos", 300.0f);
+	float ypos = m_AshitaCore->GetConfigurationManager()->GetFloat("Deeps", "guipos", "ypos", 300.0f);
 
     IFontObject* font = m_AshitaCore->GetFontManager()->Create("DeepsBackground");
-	font->SetFontFamily("Consolas");
+	font->SetFontFamily("Arial");
 	font->SetFontHeight(10);
     font->SetAutoResize(false);
     font->GetBackground()->SetColor(D3DCOLOR_ARGB(0xCC, 0x00, 0x00, 0x00));
-    font->GetBackground()->SetVisibility(true);
-    font->GetBackground()->SetWidth(158);
-    font->GetBackground()->SetHeight(256);
+    font->GetBackground()->SetVisible(true);
+    font->GetBackground()->SetWidth(258);
+    font->GetBackground()->SetHeight(17);
+    font->GetBackground()->SetCanFocus(false);
     font->SetColor(D3DCOLOR_ARGB(0xFF, 0xFF, 0xFF, 0xFF));
     font->SetBold(false);
     font->SetText("");
 	font->SetPositionX(xpos);
 	font->SetPositionY(ypos);
-    font->SetVisibility(true);
-    font->SetMouseEventFunction(g_onClick);
+    font->SetVisible(true);
+    font->SetCanFocus(true);
+    font->SetMouseCallback((fontmouseevent_f)g_onClick);
+    
 
     return true;
 }
@@ -503,9 +546,9 @@ void Deeps::Direct3DRelease(void)
 {
     IFontObject* deepsBase = m_AshitaCore->GetFontManager()->Get("DeepsBackground");
 
-    m_AshitaCore->GetConfigurationManager()->set_value("Deeps", "xpos", std::to_string(deepsBase->GetPositionX()).c_str());
-    m_AshitaCore->GetConfigurationManager()->set_value("Deeps", "ypos", std::to_string(deepsBase->GetPositionY()).c_str());
-    m_AshitaCore->GetConfigurationManager()->Save("Deeps", "Deeps.xml");
+    m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "guipos", "xpos", std::to_string(deepsBase->GetPositionX()).c_str());
+    m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "guipos", "ypos", std::to_string(deepsBase->GetPositionY()).c_str());
+    m_AshitaCore->GetConfigurationManager()->Save("Deeps", "Deeps");
 
     m_AshitaCore->GetFontManager()->Delete("DeepsBackground");
 
@@ -514,161 +557,149 @@ void Deeps::Direct3DRelease(void)
         char name[32];
         sprintf_s(name, 32, "DeepsBar%d", i);
         m_AshitaCore->GetFontManager()->Delete(name);
-        memset(name, 0, sizeof name);
-        sprintf_s(name, 32, "DeepsBarClick%d", i);
-        m_AshitaCore->GetFontManager()->Delete(name);
     }
 }
 
-/**
- * @brief Direct3D prerender call to allow this plugin to prepare for rendering.
- *
- * @note This will only be called if you returned true in Direct3DInitialize!
- */
-void Deeps::Direct3DPreRender(void)
-{
-}
-
-/**
- * @brief Direct3D render call to allow this plugin to render any custom things.
- *
- * @note This will only be called if you returned true in Direct3DInitialize!
- */
-void Deeps::Direct3DRender(void)
+void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion)
 {
     IFontObject* deepsBase = m_AshitaCore->GetFontManager()->Get("DeepsBackground");
-
-    if (m_charInfo == 0)
+    deepsBase->SetCanFocus(false);
+    clock_t now = std::clock();
+    if (now - m_LastRender > 0.1*CLOCKS_PER_SEC) // Render only every 100 ms to minimize performance impact
     {
-        deepsBase->SetText(" Deeps - Damage Done");
-        deepsBase->GetBackground()->SetWidth(158);
-        std::vector<entitysources_t> temp;
-        uint64_t total = 0;
-        for (auto e : entities)
+        if (m_charInfo == 0)
         {
-            if (e.second.total() != 0 && temp.size() < 15)
+            deepsBase->SetText(" Deeps - Damage Done");
+            //deepsBase->GetBackground()->SetWidth(308);
+            std::vector<entitysources_t> temp;
+            uint64_t total = 0;
+            for (auto e : entities)
             {
-                temp.push_back(e.second);
-                total += e.second.total();
-            }
-        }
-        std::sort(temp.begin(), temp.end(), [](entitysources_t a, entitysources_t b){return a > b; });
-        repairBars(deepsBase, temp.size());
-
-        int i = 0;
-        uint64_t max = 0;
-        clickMap.clear();
-        for (auto e : temp)
-        {
-            char name[32];
-            sprintf_s(name, 32, "DeepsBar%d", i);
-            IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
-            if (e.total() > max) max = e.total();
-            bar->GetBackground()->SetWidth(150 * (total == 0 ? 1 : ((float)e.total() / (float)max)));
-            bar->GetBackground()->SetColor(e.color);
-            char string[256];
-            sprintf_s(string, 256, " %-10.10s %6llu %03.1f%%\n", e.name.c_str(), e.total(), total == 0 ? 0 : 100 * ((float)e.total() / (float)total));
-            bar->SetText(string);
-            memset(name, 0, sizeof name);
-            sprintf_s(name, 32, "DeepsBarClick%d", i);
-            bar = m_AshitaCore->GetFontManager()->Get(name);
-            bar->GetBackground()->SetWidth(150);
-            clickMap.insert(std::pair<IFontObject*, std::string>(bar, e.name));
-            i++;
-        }
-    }
-    else
-    {
-        auto it = entities.find(m_charInfo);
-        if (it != entities.end())
-        {
-            if (m_sourceInfo == "")
-            {
-                std::vector<source_t> temp;
-                uint64_t total = 0;
-                for (auto s : it->second.sources)
+                if (e.second.total() != 0 && temp.size() < 15)
                 {
-                    if (s.second.total() != 0 && temp.size() < 15)
-                    {
-                        temp.push_back(s.second);
-                        total += s.second.total();
-                    }
+                    temp.push_back(e.second);
+                    total += e.second.total();
                 }
-                std::sort(temp.begin(), temp.end(), [](source_t a, source_t b){return a > b; });
+            }
+            std::sort(temp.begin(), temp.end(), [](entitysources_t a, entitysources_t b){return a > b; });
+            repairBars(deepsBase, temp.size());
+
+            int i = 0;
+            uint64_t max = 0;
+            clickMap.clear();
+            for (auto e : temp)
+            {
+                char name[32];
+                sprintf_s(name, 32, "DeepsBar%d", i);
+                IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
+                if (e.total() > max) max = e.total();
+                bar->GetBackground()->SetWidth(250 * (total == 0 ? 1 : ((float)e.total() / (float)max)));
+                bar->GetBackground()->SetColor(e.color);
                 char string[256];
-                sprintf_s(string, 256, " %s - Sources\n", it->second.name.c_str());
-                deepsBase->SetText(string);
-                deepsBase->GetBackground()->SetWidth(158);
-
-                repairBars(deepsBase, temp.size());
-                int i = 0;
-                uint64_t max = 0;
-                clickMap.clear();
-                for (auto s : temp)
-                {
-                    char name[32];
-                    sprintf_s(name, 32, "DeepsBar%d", i);
-                    IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
-                    if (s.total() > max) max = s.total();
-                    bar->GetBackground()->SetWidth(150 * (total == 0 ? 1 : ((float)s.total() / (float)max)));
-                    bar->GetBackground()->SetColor(it->second.color);
-                    char string[256];
-                    sprintf_s(string, 256, " %-10.10s %6llu %03.1f%%\n", s.name.c_str(), s.total(), total == 0 ? 0 : 100 * ((float)s.total() / (float)total));
-                    bar->SetText(string);
-                    memset(name, 0, sizeof name);
-                    sprintf_s(name, 32, "DeepsBarClick%d", i);
-                    bar = m_AshitaCore->GetFontManager()->Get(name);
-                    bar->GetBackground()->SetWidth(150);
-                    clickMap.insert(std::pair<IFontObject*, std::string>(bar, s.name));
-                    i++;
-                }
+                sprintf_s(string, 256, " %d. %-10.10s %6llu (%03.1f%%)  -  Hit: %03.1f%% \n",
+                        i+1, e.name.c_str(), e.total(), total == 0 ? 0 : 100 * ((float)e.total() / (float)total), e.hitrate());
+                bar->SetText(string);
+                clickMap.insert(std::pair<IFontObject*, std::string>(bar, e.name));
+                i++;
             }
-            else
+        }
+        else
+        {
+            auto it = entities.find(m_charInfo);
+            if (it != entities.end())
             {
-                for (auto s : it->second.sources)
+                if (m_sourceInfo == "") // Updating top layer of the plugin
                 {
-                    if (s.second.name == m_sourceInfo)
+                    std::vector<source_t> temp;
+                    uint64_t total = 0;
+                    for (auto s : it->second.sources)
                     {
-                        std::vector<std::pair<const char*, damage_t> > temp;
-                        uint32_t count = 0;
-                        for (auto d : s.second.damage)
+                        if (s.second.total() != 0 && temp.size() < 15)
                         {
-                            if (d.second.count != 0 && temp.size() < 15)
-                            {
-                                temp.push_back(d);
-                                count += d.second.count;
-                            }
+                            temp.push_back(s.second);
+                            total += s.second.total();
                         }
-                        std::sort(temp.begin(), temp.end(), [](std::pair<const char*, damage_t> a, std::pair<const char*, damage_t> b){return a.second > b.second; });
+                    }
+                    std::sort(temp.begin(), temp.end(), [](source_t a, source_t b){return a > b; });
+                    char string[256];
+                    sprintf_s(string, 256, " %s - Sources\n", it->second.name.c_str());
+                    deepsBase->SetText(string);
+
+                    repairBars(deepsBase, temp.size());
+                    int i = 0;
+                    uint64_t max = 0;
+                    clickMap.clear();
+                    for (auto s : temp)
+                    {
+                        char name[32];
+                        sprintf_s(name, 32, "DeepsBar%d", i);
+                        IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
+                        if (s.total() > max) max = s.total();
+                        bar->GetBackground()->SetWidth(250 * (total == 0 ? 1 : ((float)s.total() / (float)max)));
+                        bar->GetBackground()->SetColor(it->second.color);
                         char string[256];
-                        sprintf_s(string, 256, " %s - %s\n", it->second.name.c_str(), s.second.name.c_str());
-                        deepsBase->SetText(string);
-                        deepsBase->GetBackground()->SetWidth(262);
-                        repairBars(deepsBase, temp.size());
-                        int i = 0;
-                        uint32_t max = 0;
-                        for (auto s : temp)
+                        sprintf_s(string, 256, " %d. %-10.10s %6llu (%03.1f%%)\n",
+                                i+1, s.name.c_str(), s.total(), total == 0 ? 0 : 100 * ((float)s.total() / (float)total));
+                        bar->SetText(string);
+                        clickMap.insert(std::pair<IFontObject*, std::string>(bar, s.name));
+                        i++;
+                    }
+                }
+                else // This is when a player's bar has been clicked into for additional details about their damage
+                {
+                    for (auto s : it->second.sources)
+                    {
+                        if (s.second.name == m_sourceInfo)
                         {
-                            char name[32];
-                            sprintf_s(name, 32, "DeepsBar%d", i);
-                            IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
-                            if (s.second.count > max) max = s.second.count;
-                            bar->GetBackground()->SetWidth(254 * (count == 0 ? 1 : 1 * ((float)s.second.count / (float)max)));
-                            bar->GetBackground()->SetColor(it->second.color);
+                            std::vector<std::pair<const char*, damage_t> > temp;
+                            uint32_t count = 0;
+                            for (auto d : s.second.damage)
+                            {
+                                if (d.second.count != 0 && temp.size() < 15)
+                                {
+                                    temp.push_back(d);
+                                    count += d.second.count;
+                                }
+                            }
+
+                            std::sort(temp.begin(), temp.end(), [](std::pair<const char*, damage_t> a, std::pair<const char*, damage_t> b){return a.second > b.second; });
                             char string[256];
-                            sprintf_s(string, 256, " %-5s Cnt:%4d Avg:%5d Max:%5d %3.1f%%\n", s.first, s.second.count, s.second.avg(), s.second.max, count == 0 ? 0 : 100 * ((float)s.second.count / (float)count));
-                            bar->SetText(string);
-                            i++;
+                            sprintf_s(string, 256, " %s - %s\n", it->second.name.c_str(), s.second.name.c_str());
+                            deepsBase->SetText(string);
+                            repairBars(deepsBase, temp.size());
+
+                            int i = 0;
+                            uint32_t max = 0;
+                            for (auto s : temp)
+                            {
+                                char name[32];
+                                sprintf_s(name, 32, "DeepsBar%d", i);
+                                IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
+                                if (s.second.count > max) max = s.second.count;
+                                bar->GetBackground()->SetWidth(250 * (count == 0 ? 1 : 1 * ((float)s.second.count / (float)max)));
+                                bar->GetBackground()->SetColor(it->second.color);
+                                char string[256];
+                                sprintf_s(string, 256, " %-5s Cnt:%4d Avg:%5d Max:%5d (%3.1f%%)\n", s.first, s.second.count, s.second.avg(), s.second.max, count == 0 ? 0 : 100 * ((float)s.second.count / (float)count));
+                                bar->SetText(string);
+                                i++;
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
             }
         }
+        deepsBase->GetBackground()->SetHeight(m_bars * 16.0f + 17);
+        m_LastRender = clock();
     }
-    deepsBase->GetBackground()->SetHeight(m_bars * 16 + 17);
 }
 
+/**
+ * @brief Starts from the font base and creates or deletes bars as necessary.
+ *
+ * @param deepsBase The base font background
+ * @param size The number of bars that should be displaying
+ */
 void Deeps::repairBars(IFontObject* deepsBase, uint8_t size)
 {
     IFontObject* previous = deepsBase;
@@ -683,19 +714,16 @@ void Deeps::repairBars(IFontObject* deepsBase, uint8_t size)
             i++;
         }
     }
-    while (m_bars != size)
+    while (m_bars != size) // Adding or deleting bars as necessary
     {
-        if (m_bars > size)
+        if (m_bars > size) // Deleting
         {
             char name[32];
             sprintf_s(name, 32, "DeepsBar%d", m_bars - 1);
             m_AshitaCore->GetFontManager()->Delete(name);
-            memset(name, 0, sizeof name);
-            sprintf_s(name, 32, "DeepsBarClick%d", m_bars - 1);
-            m_AshitaCore->GetFontManager()->Delete(name);
             m_bars--;
         }
-        else if (m_bars < size)
+        else if (m_bars < size) // Adding
         {
             char name[32];
             sprintf_s(name, 32, "DeepsBar%d", m_bars);
@@ -708,45 +736,35 @@ void Deeps::repairBars(IFontObject* deepsBase, uint8_t size)
             }
             else
             {
-                bar->SetAnchorParent((uint32_t)Ashita::FrameAnchor::BottomLeft);
+                bar->SetAnchorParent(Ashita::FrameAnchor::BottomLeft);
 				bar->SetPositionX(0);
 				bar->SetPositionY(3);
             }
             bar->SetAutoResize(false);
-			bar->SetFontFamily("Consolas");
+			bar->SetFontFamily("Arial");
 			bar->SetFontHeight(8);
-            bar->GetBackground()->SetColor(D3DCOLOR_ARGB(0xFF, 0x00, 0x7C, 0x5C));
-            bar->GetBackground()->SetVisibility(true);
-            std::string path = m_AshitaCore->GetAshitaInstallPathA();
+            bar->GetBackground()->SetVisible(true); // Makes visible the bars background texture itself
+            std::string path = m_AshitaCore->GetInstallPath();
             path.append("\\Resources\\Deeps\\bar.tga");
             bar->GetBackground()->SetTextureFromFile(path.c_str());
-            bar->GetBackground()->SetWidth(254);
+            bar->GetBackground()->SetWidth(250);
             bar->GetBackground()->SetHeight(13);
-            bar->SetVisibility(true);
-
-            memset(name, 0, sizeof name);
-            sprintf_s(name, 32, "DeepsBarClick%d", m_bars);
-            IFontObject* clickBar = m_AshitaCore->GetFontManager()->Create(name);
-            clickBar->SetParent(bar);
-			clickBar->SetPositionX(0);
-			clickBar->SetPositionY(0);
-            clickBar->SetAutoResize(false);
-            clickBar->GetBackground()->SetColor(D3DCOLOR_ARGB(0x00, 0x00, 0x00, 0x00));
-            clickBar->GetBackground()->SetVisibility(true);
-            clickBar->GetBackground()->SetWidth(254);
-            clickBar->GetBackground()->SetHeight(13);
-            clickBar->SetVisibility(true);
-            clickBar->SetMouseEventFunction(g_onClick);
+            bar->GetBackground()->SetCanFocus(true);
+            bar->SetVisible(true); // Makes visible the text on the bar
+            bar->SetMouseCallback((fontmouseevent_f)g_onClick);
+            bar->SetCanFocus(true);
 
             m_bars++;
             previous = bar;
         }
+
     }
 }
 
-void Deeps::onClick(int type, IFontObject* font, float xPos, float yPos)
+void Deeps::onClick(Ashita::MouseEvent type, IFontObject* font, int32_t xPos, int32_t yPos)
 {
-    if (type == 1 && font == m_AshitaCore->GetFontManager()->Get("DeepsBackground"))
+
+    if (type == Ashita::MouseEvent::ClickRight)
     {
         if (m_sourceInfo != "")
         {
@@ -762,7 +780,7 @@ void Deeps::onClick(int type, IFontObject* font, float xPos, float yPos)
     if (m_charInfo == 0)
     {
         //Char was clicked
-        if (type == 0)
+        if (type == Ashita::MouseEvent::ClickLeft)
         {
             // left click
             try
@@ -788,7 +806,7 @@ void Deeps::onClick(int type, IFontObject* font, float xPos, float yPos)
         if (m_sourceInfo == "")
         {
             //source was clicked
-            if (type == 0)
+            if (type == Ashita::MouseEvent::ClickLeft)
             {
                 try
                 {
@@ -809,26 +827,9 @@ void Deeps::onClick(int type, IFontObject* font, float xPos, float yPos)
  *
  * @note This is a required export, your plugin must implement this!
  */
-__declspec(dllexport) double __stdcall GetInterfaceVersion(void)
+__declspec(dllexport) double __stdcall expGetInterfaceVersion(void)
 {
     return ASHITA_INTERFACE_VERSION;
-}
-
-/**
- * @brief Gets the plugin data for this plugin.
- *
- * @note This is a required export, your plugin must implement this!
- */
-__declspec(dllexport) void __stdcall CreatePluginInfo(plugininfo_t* lpBuffer)
-{
-    g_PluginInfo = lpBuffer;
-
-    strcpy_s(g_PluginInfo->Name, sizeof(g_PluginInfo->Name), "Deeps");
-    strcpy_s(g_PluginInfo->Author, sizeof(g_PluginInfo->Author), "kjLotus");
-
-    g_PluginInfo->InterfaceVersion = ASHITA_INTERFACE_VERSION;
-    g_PluginInfo->PluginVersion = 2.03f;
-    g_PluginInfo->Priority = 0;
 }
 
 /**
@@ -836,12 +837,12 @@ __declspec(dllexport) void __stdcall CreatePluginInfo(plugininfo_t* lpBuffer)
  *
  * @note This is a required export, your plugin must implement this!
  */
-__declspec(dllexport) IPlugin* __stdcall CreatePlugin(void)
+__declspec(dllexport) IPlugin* __stdcall expCreatePlugin(const char* args)
 {
     return (IPlugin*)new Deeps();
 }
 
-void g_onClick(int type, void* font, float xPos, float yPos)
+void g_onClick(Ashita::MouseEvent eventId, void* object, int32_t xpos, int32_t ypos)
 {
-    g_Deeps->onClick(type, (IFontObject*)font, xPos, yPos);
+    g_Deeps->onClick(eventId, (IFontObject*)object, xpos, ypos);
 }

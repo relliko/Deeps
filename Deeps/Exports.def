@@ -1,5 +1,4 @@
 LIBRARY "Deeps"
 EXPORTS
-    GetInterfaceVersion
-    CreatePluginInfo
-    CreatePlugin
+    expGetInterfaceVersion
+    expCreatePlugin

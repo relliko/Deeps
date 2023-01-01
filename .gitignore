@@ -217,5 +217,8 @@ FakesAssemblies/
 **/*.Server/ModelManifest.xml
 _Pvt_Extensions
 
+# Visual Studio Code files
+.vscode/
+
 /Ashita.exp
 /Ashita.lib
