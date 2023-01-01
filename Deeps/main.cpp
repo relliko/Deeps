@@ -525,14 +525,14 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
     font->GetBackground()->SetVisible(true);
     font->GetBackground()->SetWidth(258);
     font->GetBackground()->SetHeight(17);
-    font->GetBackground()->SetCanFocus(false);
+    //font->GetBackground()->SetCanFocus(false);
     font->SetColor(D3DCOLOR_ARGB(0xFF, 0xFF, 0xFF, 0xFF));
     font->SetBold(false);
     font->SetText("");
 	font->SetPositionX(xpos);
 	font->SetPositionY(ypos);
     font->SetVisible(true);
-    font->SetCanFocus(true);
+    //font->SetCanFocus(true);
     font->SetMouseCallback((fontmouseevent_f)g_onClick);
     
 
@@ -563,7 +563,7 @@ void Deeps::Direct3DRelease(void)
 void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion)
 {
     IFontObject* deepsBase = m_AshitaCore->GetFontManager()->Get("DeepsBackground");
-    deepsBase->SetCanFocus(false);
+    deepsBase->SetLockedZ(true);
     clock_t now = std::clock();
     if (now - m_LastRender > 0.1*CLOCKS_PER_SEC) // Render only every 100 ms to minimize performance impact
     {
@@ -749,10 +749,11 @@ void Deeps::repairBars(IFontObject* deepsBase, uint8_t size)
             bar->GetBackground()->SetTextureFromFile(path.c_str());
             bar->GetBackground()->SetWidth(250);
             bar->GetBackground()->SetHeight(13);
-            bar->GetBackground()->SetCanFocus(true);
+            //bar->GetBackground()->SetCanFocus(true);
             bar->SetVisible(true); // Makes visible the text on the bar
             bar->SetMouseCallback((fontmouseevent_f)g_onClick);
-            bar->SetCanFocus(true);
+            //bar->SetCanFocus(false);
+            bar->SetLocked(true);
 
             m_bars++;
             previous = bar;
