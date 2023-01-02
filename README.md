@@ -1,6 +1,8 @@
 # Deeps for Ashita v4
 Credit to kjLotus for the original version of Deeps that was the basis for this update.
 
+Special thanks to Thorny for help with refactoring and general advice and tips on Ashita development!
+
 Forked from https://git.ashitaxi.com/Plugins/Deeps
 
 ## Installation
