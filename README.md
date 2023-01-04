@@ -20,18 +20,18 @@ Left clicking on a bar will show additional details about the damage dealt, righ
 Shift clicking the background will allow you to reposition the window.
 
 
-## New features 
+## New features
+- Pet damage included in player's damage contribution
 - Static colors for job bars
-- Damage from outside of party or alliance is now filtered out.
+- Damage from outside of party or alliance can now be filtered out
 - Overall hit rating displayed alongside damage done
 
+## Patch Notes
+### v1.10
+- Pet damage now counts towards a player's total damage contribution. It should not affect the displayed overall hit rate
+- Added a setting to toggle static job colors, typing /dps jobcolors will bring back randomized coloring for jobs
+- Added a setting to display data from non-party members, toggle by typing /dps partyonly
 
-## Known issues
-- Sometimes clicking the GUI can cause client crashes, recommended to avoid doing it during important encounters.
-
-
-## TODO
-- Add hit % to the report function
-- Need to assign colors to some newer jobs
-- Toggle to display damage from people outside of party/alliances
-- Include pet damage
+## TODO (No guarantees)
+- Config to exclude skillchain damage or display skillchains as their own category
+- Log saving to disk
