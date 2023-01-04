@@ -206,7 +206,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                             bar->GetBackground()->SetWidth(250 * (count == 0 ? 1 : 1 * ((float)s.second.count / (float)max)));
                             bar->GetBackground()->SetColor(this->CheckColorSetting(it->first, it->second.color));
                             char string[256];
-                            sprintf_s(string, 256, " %-5s Cnt:%4d Avg:%5d Max:%5d (%3.1f%%)\n", s.first, s.second.count, s.second.avg(), s.second.max, count == 0 ? 0 : 100 * ((float)s.second.count / (float)count));
+                            sprintf_s(string, 256, " %-5sCnt:%4d  Avg:%5d  Max:%5d (%3.1f%%)\n", s.first, s.second.count, s.second.avg(), s.second.max, count == 0 ? 0 : 100 * ((float)s.second.count / (float)count));
                             bar->SetText(string);
                             i++;
                         }

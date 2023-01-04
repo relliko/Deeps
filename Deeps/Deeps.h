@@ -54,6 +54,7 @@ class Deeps : IPlugin
     bool                  m_JobColors;
     int32_t               m_MaxBars;
     bool                  m_PartyOnly;
+    bool                  m_IncludeSC;
 
     // Packet Deduplication reference
 	std::list<void*>	  m_Packets;
@@ -74,7 +75,7 @@ class Deeps : IPlugin
 private:
     //damage.cpp
     uint16_t GetIndexFromId(int id);
-    source_t* GetDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID);
+    source_t* GetDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID, bool isPet);
     bool UpdateDamageSource(source_t* source, uint16_t message, uint32_t damage);
 
     //main.cpp

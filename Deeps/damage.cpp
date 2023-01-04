@@ -32,39 +32,74 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
         m_Packets.pop_front();
     }
 
+    entitysources_t* entityInfo = NULL;
+
     if (id == 0x28) //action
     {
         uint8_t actionNum  = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 182, 4));
         uint8_t targetNum  = Read8(data, 0x09);
         uint8_t actionType = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 82, 4));
-        //uint8_t reaction = 0;
-        //uint8_t speceffect = 0;
         uint16_t actionID = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 86, 10));
         uint32_t userID   = Read32(data, 0x05);
         uint16_t startBit = 150;
         uint16_t damage   = 0;
 
-        if (userID > 0x1000000)
-            return false;
 
-        auto it                     = m_Entities.find(userID);
-        entitysources_t* entityInfo = NULL;
+        auto it = m_Entities.find(userID);
 
         if (it != m_Entities.end())
         {
             entityInfo = &it->second;
+            // Check this entity for a pet and creates an entitysource_t for it if necessary
+            uint16_t index = GetIndexFromId(userID);
+            uint16_t petIndex = m_AshitaCore->GetMemoryManager()->GetEntity()->GetPetTargetIndex(index);
+            uint32_t petID = m_AshitaCore->GetMemoryManager()->GetEntity()->GetServerId(petIndex);
+
+            if (petIndex > 0)
+            {
+                entitysources_t newPetInfo;
+                auto name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(index);
+                newPetInfo.name        = name != nullptr ? name : "(Unknown)";
+                newPetInfo.color       = RandomColors[rand() % RandomColors.size()];
+                newPetInfo.id          = petID;
+                newPetInfo.ownerid     = entityInfo->id;
+                m_Entities.insert(std::make_pair(petID, newPetInfo)).first->second;
+            }
+            //m_AshitaCore->GetChatManager()->Writef(-3, false, "pet index: %d", petIndex);
         }
         else
         {
             uint16_t index = GetIndexFromId(userID);
             if (index != 0)
             {
+                // Ignoring NPCs
+                if (userID > 0x1000000)
+                {
+                    return false;
+                }
                 entitysources_t newInfo;
                 auto name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(index);
                 newInfo.name        = name != nullptr ? name : "(Unknown)";
                 newInfo.color       = RandomColors[rand() % RandomColors.size()];
                 newInfo.id          = userID;
+                newInfo.ownerid     = NULL;
                 entityInfo          = &m_Entities.insert(std::make_pair(userID, newInfo)).first->second;
+            }
+        }
+
+        bool isPet = false;
+        if (entityInfo->ownerid != NULL) // Only a pet entity should have data in this field
+        {
+            isPet = true;
+        }
+
+        // When the entity is a pet, swap the entityInfo with its owner to count its damage towards them.
+        if (isPet)
+        {
+            auto it = m_Entities.find(entityInfo->ownerid);
+            if (it != m_Entities.end())
+            {
+                entityInfo = &it->second;
             }
         }
 
@@ -79,7 +114,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
             {
                 if (actionID == 0)
                     return false;
-                source_t* source   = GetDamageSource(entityInfo, actionType, actionID);
+                source_t* source   = GetDamageSource(entityInfo, actionType, actionID, isPet);
                 uint16_t messageID = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 80, 10));
 
                 uint32_t addEffectDamage = 0;
@@ -102,7 +137,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
 
                         //Daken (ranged attack on attack)
                         if (actionType == 1 && animation == 4)
-                            source = GetDamageSource(entityInfo, actionType + 1, actionID);
+                            source = GetDamageSource(entityInfo, actionType + 1, actionID, isPet);
 
                         if (!UpdateDamageSource(source, messageID, mainDamage))
                             return false;
@@ -175,9 +210,18 @@ uint16_t Deeps::GetIndexFromId(int id)
     return 0;
 }
 
-source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID)
+source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID, bool isPet)
 {
-    uint32_t key   = (actionID << 8) + actionType;
+    uint32_t key;
+    // Differentiating keys for pets so their damage is in its own category
+    if (isPet)
+    {
+        key = 0xBADC0DE;
+    }
+    else
+    {
+        key = (actionID << 8) + actionType;
+    }
     auto sourcesIt = entityInfo->sources.find(key);
 
     source_t* source;
@@ -193,7 +237,12 @@ source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType
         sourcesIt = entityInfo->sources.insert(std::make_pair(key, newsource)).first;
 
         source = &sourcesIt->second;
-        if (actionType == 1)
+
+        if (isPet)
+        {
+            source->name.append("Pet");
+        }
+        else if (actionType == 1)
         {
             source->name.append("Attack");
         }

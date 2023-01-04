@@ -28,6 +28,7 @@ Deeps::Deeps(void)
     , m_JobColors(true)
     , m_MaxBars(15)
     , m_PartyOnly(true)
+    , m_IncludeSC(true)
 { }
 Deeps::~Deeps(void)
 { }
@@ -53,7 +54,7 @@ const char* Deeps::GetName(void) const
 
 double Deeps::GetVersion(void) const
 {
-    return 1.01f;
+    return 1.10f;
 }
 
 /**
@@ -196,6 +197,11 @@ bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
         out << Ashita::Chat::Header("Deeps");
         out << Ashita::Chat::Color2(2, "/dps reset");
         out << Ashita::Chat::Message(" - Reset damage counters.");
+        m_AshitaCore->GetChatManager()->Write(0, false, out.str().c_str());
+        out = std::stringstream();
+        out << Ashita::Chat::Header("Deeps");
+        out << Ashita::Chat::Color2(2, "/dps report [s/p/l] [#]");
+        out << Ashita::Chat::Message(" - Report damage data to say, party, or linkshell.");
         m_AshitaCore->GetChatManager()->Write(0, false, out.str().c_str());
         out = std::stringstream();
         out << Ashita::Chat::Header("Deeps");

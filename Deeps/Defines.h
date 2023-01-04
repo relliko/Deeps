@@ -138,6 +138,7 @@ struct entitysources_t
     std::string name; // Player name
     uint32_t color;   // A player's bar color
     uint32_t id;
+    uint32_t ownerid;   // Player's pet ID if they have one
     std::map<uint32_t, source_t> sources;
 
     // Returns total damage dealt
@@ -158,10 +159,13 @@ struct entitysources_t
         uint64_t totalMiss  = 0;
         for (auto s : sources)
         {
-            totalCount += s.second.getCount();
-            totalMiss += s.second.getMissed();
+            if (s.second.name != "Skillchain" && s.second.name != "Pet")
+            {
+                totalCount += s.second.getCount();
+                totalMiss += s.second.getMissed();
+            }
         }
-        return 100 * ((float)(totalCount - totalMiss) / (float)totalCount);
+        return totalCount == 0 ? 0.0f : 100 * ((float)(totalCount - totalMiss) / (float)totalCount);
     }
     bool operator==(const entitysources_t& o) const
     {
@@ -175,6 +179,7 @@ struct entitysources_t
 };
 
 static const std::vector<D3DCOLOR> JobColors = {
+    D3DCOLOR_ARGB(0xFF, 0x19, 0x19, 0x70), // NON: Midnight blue
     D3DCOLOR_ARGB(0xFF, 0xFF, 0x00, 0x00), // WAR: Red
     D3DCOLOR_ARGB(0xFF, 0xFF, 0x8C, 0x00), // MNK: Dark orange
     D3DCOLOR_ARGB(0xFF, 0xFF, 0xFF, 0xFF), // WHM: White
@@ -191,11 +196,11 @@ static const std::vector<D3DCOLOR> JobColors = {
     D3DCOLOR_ARGB(0xFF, 0x93, 0x70, 0xDB), // DRG: Medium purple
     D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0xFF), // SMN: Cyan
     D3DCOLOR_ARGB(0xFF, 0x41, 0x69, 0xE1), // BLU: Royal blue
-    D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // COR PLACEHOLDER
-    D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // PUP PLACEHOLDER
-    D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // DNC PLACEHOLDER
-    D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // SCH PLACEHOLDER
-    D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00), // GEO PLACEHOLDER
+    D3DCOLOR_ARGB(0xFF, 0xFF, 0xD8, 0xB1), // COR Apricot
+    D3DCOLOR_ARGB(0xFF, 0xFF, 0xFA, 0xC8), // PUP Beige
+    D3DCOLOR_ARGB(0xFF, 0xE6, 0x19, 0x4B), // DNC Red
+    D3DCOLOR_ARGB(0xFF, 0xCD, 0x85, 0x3F), // SCH Peru
+    D3DCOLOR_ARGB(0xFF, 0x80, 0x80, 0x00), // GEO Olive
     D3DCOLOR_ARGB(0xFF, 0x00, 0xFF, 0x00)  // RUN PLACEHOLDER
 };
 
