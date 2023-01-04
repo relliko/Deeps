@@ -27,7 +27,7 @@ Shift clicking the background will allow you to reposition the window.
 - Overall hit rating displayed alongside damage done
 
 ## Patch Notes
-### v1.10
+### v1.02
 - Pet damage now counts towards a player's total damage contribution. It should not affect the displayed overall hit rate
 - Added a setting to toggle static job colors, typing /dps jobcolors will bring back randomized coloring for jobs
 - Added a setting to display data from non-party members, toggle by typing /dps partyonly
