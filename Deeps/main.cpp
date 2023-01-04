@@ -28,7 +28,6 @@ Deeps::Deeps(void)
     , m_JobColors(true)
     , m_MaxBars(15)
     , m_PartyOnly(true)
-    , m_IncludeSC(true)
 { }
 Deeps::~Deeps(void)
 { }
@@ -54,7 +53,7 @@ const char* Deeps::GetName(void) const
 
 double Deeps::GetVersion(void) const
 {
-    return 1.10f;
+    return 1.02f;
 }
 
 /**
