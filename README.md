@@ -33,6 +33,10 @@ Shift clicking the background will allow you to reposition the window.
 - High jump displays as Avalanche and Jump displays as Gale axe
 
 ## Patch Notes
+### v1.03
+- Stability fixes
+- Improved visibility of DRK bars
+
 ### v1.02
 - Pet damage now counts towards a player's total damage contribution. It should not affect the displayed overall hit rate
 - Added a setting to toggle static job colors, typing /dps jobcolors will bring back randomized coloring for jobs
