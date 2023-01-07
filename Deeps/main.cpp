@@ -53,7 +53,7 @@ const char* Deeps::GetName(void) const
 
 double Deeps::GetVersion(void) const
 {
-    return 1.02f;
+    return 1.03f;
 }
 
 /**
@@ -236,7 +236,7 @@ void Deeps::Report(char mode, int max)
             IFontObject* bar = m_Bars[i];
             if ((bar != nullptr) && (mode != 0x00))
             {
-                sprintf_s(buff, 256, "/%c %d -%s", mode, i + 1, bar->GetText());
+                sprintf_s(buff, 256, "/%c %s", mode, bar->GetText());
                 m_AshitaCore->GetChatManager()->QueueCommand(1, buff);
             }
         }

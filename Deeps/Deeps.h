@@ -64,7 +64,7 @@ class Deeps : IPlugin
     std::vector<IFontObject*>           m_Bars;
     uint32_t                            m_CharInfo;
     std::map<IFontObject*, std::string> m_ClickMap;
-    std::map<uint32_t, entitysources_t> m_Entities;
+    std::unordered_map<uint32_t, entitysources_t> m_Entities;
     std::string                         m_SourceInfo;
 
     // Mouse Handler

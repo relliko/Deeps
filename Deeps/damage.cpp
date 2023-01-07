@@ -44,6 +44,10 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
         uint16_t startBit = 150;
         uint16_t damage   = 0;
 
+        if (userID == 0 || actionType == 0 || actionID == 0)
+        {
+            return false;
+        }
 
         auto it = m_Entities.find(userID);
 
@@ -55,19 +59,18 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
             uint16_t petIndex = m_AshitaCore->GetMemoryManager()->GetEntity()->GetPetTargetIndex(index);
             uint32_t petID = m_AshitaCore->GetMemoryManager()->GetEntity()->GetServerId(petIndex);
 
-            if (petIndex > 0)
+            if (petIndex > 0 && petID > 0)
             {
                 entitysources_t newPetInfo;
-                auto name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(index);
+                auto name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(petIndex);
                 newPetInfo.name        = name != nullptr ? name : "(Unknown)";
                 newPetInfo.color       = RandomColors[rand() % RandomColors.size()];
                 newPetInfo.id          = petID;
-                newPetInfo.ownerid     = entityInfo->id;
+                newPetInfo.ownerid     = userID;
                 m_Entities.insert(std::make_pair(petID, newPetInfo)).first->second;
             }
-            //m_AshitaCore->GetChatManager()->Writef(-3, false, "pet index: %d", petIndex);
         }
-        else
+        else // new entity being stored
         {
             uint16_t index = GetIndexFromId(userID);
             if (index != 0)
@@ -84,22 +87,11 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
                 newInfo.id          = userID;
                 newInfo.ownerid     = NULL;
                 entityInfo          = &m_Entities.insert(std::make_pair(userID, newInfo)).first->second;
+
             }
-        }
-
-        bool isPet = false;
-        if (entityInfo->ownerid != NULL) // Only a pet entity should have data in this field
-        {
-            isPet = true;
-        }
-
-        // When the entity is a pet, swap the entityInfo with its owner to count its damage towards them.
-        if (isPet)
-        {
-            auto it = m_Entities.find(entityInfo->ownerid);
-            if (it != m_Entities.end())
+            if (m_Debug)
             {
-                entityInfo = &it->second;
+                m_AshitaCore->GetChatManager()->Writef(-3, false, "Total entities: %d", m_Entities.size());
             }
         }
 
@@ -108,6 +100,26 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
             if (m_Debug)
             {
                 m_AshitaCore->GetChatManager()->Writef(-3, false, "Action Type: %d Action ID: %d", actionType, actionID);
+            }
+
+            bool isPet = false;
+            if (entityInfo->ownerid != NULL) // Only a pet entity should have data in this field
+            {
+                isPet = true;
+            }
+
+            // When the entity is a pet, swap the entityInfo with its owner to count its damage towards them.
+            if (isPet)
+            {
+                auto it = m_Entities.find(entityInfo->ownerid);
+                if (it != m_Entities.end())
+                {
+                    entityInfo = &it->second;
+                }
+                else
+                {
+                    return false;
+                }
             }
 
             if ((actionType >= 1 && actionType <= 4) || (actionType == 6) || (actionType == 11) || (actionType == 14) || (actionType == 15))
