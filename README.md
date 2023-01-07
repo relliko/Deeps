@@ -26,6 +26,12 @@ Shift clicking the background will allow you to reposition the window.
 - Damage from outside of party or alliance can now be filtered out
 - Overall hit rating displayed alongside damage done
 
+## Known issues
+- As of 1.02 there are crashes when running around near other parties that have pets.
+- May crash when changing job and exiting mog house
+- Reporting has duplicate ranking numbers
+- High jump displays as Avalanche and Jump displays as Gale axe
+
 ## Patch Notes
 ### v1.02
 - Pet damage now counts towards a player's total damage contribution. It should not affect the displayed overall hit rate
