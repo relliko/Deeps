@@ -394,6 +394,6 @@ bool Deeps::CheckPartySetting(uint32_t id)
             return true;
         }
     }
-    
+
     return false;
 }
