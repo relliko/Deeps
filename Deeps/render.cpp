@@ -113,9 +113,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
         m_ClickMap.clear();
         for (auto iter = temp.begin(); iter != temp.end(); iter++)
         {
-            char name[32];
-            sprintf_s(name, 32, "DeepsBar%d", i);
-            IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
+            IFontObject* bar = m_Bars[i];
             if (iter->total() > max)
                 max = iter->total();
             bar->GetBackground()->SetWidth(250 * (total == 0 ? 1 : ((float)iter->total() / (float)max)));
@@ -149,16 +147,13 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                 char string[256];
                 sprintf_s(string, 256, " %s - Sources\n", it->second.name.c_str());
                 m_Background->SetText(string);
-
                 RepairBars(m_Background, temp.size());
                 int i        = 0;
                 uint64_t max = 0;
                 m_ClickMap.clear();
                 for (auto s : temp)
                 {
-                    char name[32];
-                    sprintf_s(name, 32, "DeepsBar%d", i);
-                    IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
+                    IFontObject* bar = m_Bars[i];
                     if (s.total() > max)
                         max = s.total();
                     bar->GetBackground()->SetWidth(250 * (total == 0 ? 1 : ((float)s.total() / (float)max)));
@@ -198,9 +193,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                         uint32_t max = 0;
                         for (auto s : temp)
                         {
-                            char name[32];
-                            sprintf_s(name, 32, "DeepsBar%d", i);
-                            IFontObject* bar = m_AshitaCore->GetFontManager()->Get(name);
+                            IFontObject* bar = m_Bars[i];
                             if (s.second.count > max)
                                 max = s.second.count;
                             bar->GetBackground()->SetWidth(250 * (count == 0 ? 1 : 1 * ((float)s.second.count / (float)max)));
@@ -265,6 +258,7 @@ void Deeps::RepairBars(IFontObject* deepsBase, uint8_t size)
     while (m_Bars.size() > size)
     {
         auto bar = m_Bars.back();
+        bar->SetParent(nullptr);
         m_AshitaCore->GetFontManager()->Delete(bar->GetAlias());
         m_Bars.pop_back();
     }
