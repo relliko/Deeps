@@ -27,12 +27,12 @@ Shift clicking the background will allow you to reposition the window.
 - Overall hit rating displayed alongside damage done
 
 ## Known issues
-- As of 1.02 there are crashes when running around near other parties that have pets.
-- May crash when changing job and exiting mog house
-- Reporting has duplicate ranking numbers
 - High jump displays as Avalanche and Jump displays as Gale axe
 
 ## Patch Notes
+### v1.04
+- Fix for crash while clicking bars
+
 ### v1.03
 - Stability fixes
 - Improved visibility of DRK bars
