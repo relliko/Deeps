@@ -32,6 +32,11 @@ Shift clicking the background will allow you to reposition the window.
 - High jump displays as Avalanche and Jump displays as Gale axe
 
 ## Patch Notes
+
+### v1.05
+- Fixed SMN blood pacts not being included in pet damage
+- Added /dps tvmode to scale the size up by 50% so it's easier to look at on big screens.
+
 ### v1.04
 - Fix for crash while clicking bars
 
