@@ -3,6 +3,8 @@ Credit to kjLotus for the original version of Deeps that was the basis for this 
 
 Special thanks to Thorny for help with refactoring and general advice and tips on Ashita development!
 
+Also thanks to ShiyoKozuki for helping test and helping me figure out some packet stuff.
+
 Forked from https://git.ashitaxi.com/Plugins/Deeps
 
 ## Installation
