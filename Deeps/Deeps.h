@@ -54,7 +54,8 @@ class Deeps : IPlugin
     bool                  m_JobColors;
     int32_t               m_MaxBars;
     bool                  m_PartyOnly;
-    bool                  m_IncludeSC;
+    bool                  m_TVMode;
+    float                 m_GUIScale;
 
     // Packet Deduplication reference
 	std::list<void*>	  m_Packets;

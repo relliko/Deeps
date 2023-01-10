@@ -36,6 +36,7 @@ void Deeps::Direct3DRelease(void)
 
     m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "guipos", "xpos", std::to_string(m_Background->GetPositionX()).c_str());
     m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "guipos", "ypos", std::to_string(m_Background->GetPositionY()).c_str());
+    m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "tvmode", "enabled", std::to_string(m_TVMode).c_str());
     m_AshitaCore->GetConfigurationManager()->Save("Deeps", "Deeps");
 
     m_AshitaCore->GetFontManager()->Delete(m_Background->GetAlias());
@@ -67,15 +68,17 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
 
     float xpos = m_AshitaCore->GetConfigurationManager()->GetFloat("Deeps", "guipos", "xpos", 300.0f);
     float ypos = m_AshitaCore->GetConfigurationManager()->GetFloat("Deeps", "guipos", "ypos", 300.0f);
+    m_TVMode = m_AshitaCore->GetConfigurationManager()->GetBool("Deeps", "tvmode", "enabled", false);
+    m_GUIScale = m_AshitaCore->GetConfigurationManager()->GetBool("Deeps", "tvmode", "enabled", false) ? 1.5f : 1.0f;
 
     m_Background = m_AshitaCore->GetFontManager()->Create("DeepsBackground");
     m_Background->SetFontFamily("Arial");
-    m_Background->SetFontHeight(10);
+    m_Background->SetFontHeight(TITLE_FONT_HEIGHT * m_GUIScale);
     m_Background->SetAutoResize(false);
     m_Background->GetBackground()->SetColor(D3DCOLOR_ARGB(0xCC, 0x00, 0x00, 0x00));
     m_Background->GetBackground()->SetVisible(true);
-    m_Background->GetBackground()->SetWidth(258);
-    m_Background->GetBackground()->SetHeight(17);
+    m_Background->GetBackground()->SetWidth(WINDOW_WIDTH * m_GUIScale);
+    m_Background->GetBackground()->SetHeight(TITLEBAR_HEIGHT * m_GUIScale);
     m_Background->GetBackground()->SetCanFocus(false);
     m_Background->SetColor(D3DCOLOR_ARGB(0xFF, 0xFF, 0xFF, 0xFF));
     m_Background->SetBold(false);
@@ -91,10 +94,14 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
 
 void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion)
 {
+    // Making sure the background heights and widths are good for when the size toggle is switched
+    m_Background->SetFontHeight(TITLE_FONT_HEIGHT * m_GUIScale);
+    m_Background->GetBackground()->SetWidth(WINDOW_WIDTH * m_GUIScale);
+    m_Background->GetBackground()->SetHeight(TITLEBAR_HEIGHT * m_GUIScale);
+
     if (m_CharInfo == 0)
     {
         m_Background->SetText(" Deeps - Damage Done");
-        //m_Background->GetBackground()->SetWidth(308);
         std::vector<entitysources_t> temp;
         uint64_t total = 0;
         for (auto iter = m_Entities.begin(); iter != m_Entities.end(); iter++)
@@ -116,7 +123,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
             IFontObject* bar = m_Bars[i];
             if (iter->total() > max)
                 max = iter->total();
-            bar->GetBackground()->SetWidth(250 * (total == 0 ? 1 : ((float)iter->total() / (float)max)));
+            bar->GetBackground()->SetWidth((BAR_WIDTH * m_GUIScale) * (total == 0 ? 1 : ((float)iter->total() / (float)max)));
             bar->GetBackground()->SetColor(this->CheckColorSetting(iter->id, iter->color));
             char string[256];
             sprintf_s(string, 256, " %d. %-10.10s %6llu (%03.1f%%)  -  Hit: %03.1f%% \n",
@@ -156,7 +163,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                     IFontObject* bar = m_Bars[i];
                     if (s.total() > max)
                         max = s.total();
-                    bar->GetBackground()->SetWidth(250 * (total == 0 ? 1 : ((float)s.total() / (float)max)));
+                    bar->GetBackground()->SetWidth((BAR_WIDTH * m_GUIScale) * (total == 0 ? 1 : ((float)s.total() / (float)max)));
                     bar->GetBackground()->SetColor(this->CheckColorSetting(it->first, it->second.color));
                     char string[256];
                     sprintf_s(string, 256, " %d. %-10.10s %6llu (%03.1f%%)\n",
@@ -196,7 +203,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                             IFontObject* bar = m_Bars[i];
                             if (s.second.count > max)
                                 max = s.second.count;
-                            bar->GetBackground()->SetWidth(250 * (count == 0 ? 1 : 1 * ((float)s.second.count / (float)max)));
+                            bar->GetBackground()->SetWidth((BAR_WIDTH * m_GUIScale) * (count == 0 ? 1 : 1 * ((float)s.second.count / (float)max)));
                             bar->GetBackground()->SetColor(this->CheckColorSetting(it->first, it->second.color));
                             char string[256];
                             sprintf_s(string, 256, " %-5sCnt:%4d  Avg:%5d  Max:%5d (%3.1f%%)\n", s.first, s.second.count, s.second.avg(), s.second.max, count == 0 ? 0 : 100 * ((float)s.second.count / (float)count));
@@ -209,7 +216,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
             }
         }
     }
-    m_Background->GetBackground()->SetHeight(m_Bars.size() * 16.0f + 17);
+    m_Background->GetBackground()->SetHeight(m_Bars.size() * (BAR_BACKGROUND_HEIGHT * m_GUIScale) + (TITLEBAR_HEIGHT * m_GUIScale));
 }
 
 /**
@@ -230,27 +237,31 @@ void Deeps::RepairBars(IFontObject* deepsBase, uint8_t size)
         auto newBar = m_AshitaCore->GetFontManager()->Create(buffer);
         newBar->SetAutoResize(false);
         newBar->SetFontFamily("Arial");
-        newBar->SetFontHeight(8);
+        if (m_TVMode)
+        {
+            newBar->SetCreateFlags(Ashita::FontCreateFlags::Bold);
+        }
+        newBar->SetFontHeight(BAR_FONT_HEIGHT * m_GUIScale);
         newBar->GetBackground()->SetColor(D3DCOLOR_ARGB(0xFF, 0x00, 0x7C, 0x5C));
         newBar->GetBackground()->SetVisible(true);
         sprintf_s(buffer, 256, "%s\\Resources\\Deeps\\bar.tga", m_AshitaCore->GetInstallPath());
         newBar->GetBackground()->SetTextureFromFile(buffer);
-        newBar->GetBackground()->SetWidth(250);
-        newBar->GetBackground()->SetHeight(13);
+        newBar->GetBackground()->SetWidth(BAR_WIDTH * m_GUIScale);
+        newBar->GetBackground()->SetHeight(BAR_HEIGHT * m_GUIScale);
         newBar->SetVisible(true);
         newBar->SetCanFocus(false);
         if (barCount == 0)
         {
             newBar->SetParent(m_Background);
-            newBar->SetPositionX(4);
-            newBar->SetPositionY(15);
+            newBar->SetPositionX(BAR_HORIZONTAL_PADDING * m_GUIScale);
+            newBar->SetPositionY((TITLEBAR_HEIGHT * m_GUIScale) - (1 * m_GUIScale));
         }
         else
         {
             newBar->SetParent(m_Bars[barCount - 1]);
             newBar->SetAnchorParent(Ashita::FrameAnchor::BottomLeft);
             newBar->SetPositionX(0);
-            newBar->SetPositionY(3);
+            newBar->SetPositionY(BETWEEN_BAR_PADDING * m_GUIScale);
         }
         m_Bars.push_back(newBar);
     }

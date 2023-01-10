@@ -28,6 +28,8 @@ Deeps::Deeps(void)
     , m_JobColors(true)
     , m_MaxBars(15)
     , m_PartyOnly(true)
+    , m_TVMode(false)
+    , m_GUIScale(1)
 { }
 Deeps::~Deeps(void)
 { }
@@ -53,7 +55,7 @@ const char* Deeps::GetName(void) const
 
 double Deeps::GetVersion(void) const
 {
-    return 1.04f;
+    return 1.05f;
 }
 
 /**
@@ -187,6 +189,17 @@ bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
                 m_AshitaCore->GetChatManager()->Writef(0, false, "%s%s", Ashita::Chat::Header("Deeps").c_str(), Ashita::Chat::Message(m_PartyOnly ? "Party Only Enabled" : "Party Only Disabled").c_str());
                 return true;
             }
+            else if (args[1] == "tvmode")
+            {
+                m_TVMode = !m_TVMode;
+                m_GUIScale = m_TVMode ? 1.5 : 1;
+                // Wipe deeps to re-render the bars correctly
+                 m_Entities.clear();
+                m_SourceInfo.clear();
+                m_CharInfo = 0;
+                m_AshitaCore->GetChatManager()->Writef(0, false, "%s%s", Ashita::Chat::Header("Deeps").c_str(), Ashita::Chat::Message(m_TVMode ? "TV Mode Enabled" : "TV Mode Disabled").c_str());
+                return true;
+            }
         }
         std::stringstream out;
         out << Ashita::Chat::Header("Deeps");
@@ -211,6 +224,11 @@ bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
         out << Ashita::Chat::Header("Deeps");
         out << Ashita::Chat::Color2(2, "/dps partyonly");
         out << Ashita::Chat::Message(" - Toggle displaying data from non-party members.");
+        m_AshitaCore->GetChatManager()->Write(0, false, out.str().c_str());
+        out = std::stringstream();
+        out << Ashita::Chat::Header("Deeps");
+        out << Ashita::Chat::Color2(2, "/dps tvmode");
+        out << Ashita::Chat::Message(" - Scales Deeps up to a size that works better on large displays. Note: This resets the current combat data.");
         m_AshitaCore->GetChatManager()->Write(0, false, out.str().c_str());
         return true;
     }

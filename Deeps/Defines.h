@@ -36,6 +36,17 @@
 #define Write64(p, pos) (*(uint64_t*)WBUFP((p), (pos)))
 #define WriteFloat(p, pos) (*(float_t*)WBUFP((p), (pos)))
 
+// GUI element size definitions
+#define TITLE_FONT_HEIGHT 10
+#define BAR_FONT_HEIGHT 8
+#define TITLEBAR_HEIGHT 17
+#define BAR_WIDTH 250
+#define BAR_HEIGHT 13
+#define BAR_HORIZONTAL_PADDING 4
+#define BAR_BACKGROUND_HEIGHT 16
+#define BETWEEN_BAR_PADDING 3
+#define WINDOW_WIDTH 258
+
 enum REACTION
 {
     REACTION_NONE  = 0x00,

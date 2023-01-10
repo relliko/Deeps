@@ -122,7 +122,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
                 }
             }
 
-            if ((actionType >= 1 && actionType <= 4) || (actionType == 6) || (actionType == 11) || (actionType == 14) || (actionType == 15))
+            if ((actionType >= 1 && actionType <= 4) || (actionType == 6) || (actionType == 11) || (actionType == 13) || (actionType == 14) || (actionType == 15))
             {
                 if (actionID == 0)
                     return false;
