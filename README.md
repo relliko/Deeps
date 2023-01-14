@@ -30,6 +30,7 @@ Shift clicking the background will allow you to reposition the window.
 
 ## Known issues
 - High jump displays as Avalanche and Jump displays as Gale axe
+- Report only shows top 4
 
 ## Patch Notes
 
