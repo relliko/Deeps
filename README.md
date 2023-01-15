@@ -32,6 +32,7 @@ Shift clicking the background will allow you to reposition the window.
 - High jump displays as Avalanche and Jump displays as Gale axe
 - Report only shows top 4
 - Missing the first swing of attack rounds may not include the rest of the rounds damage
+- If multiple pets are in a party and people summon and dismiss them the pet damage may end up tied to the wrong player. Recommended to reset if pets are changed around a lot.
 
 ## Patch Notes
 
