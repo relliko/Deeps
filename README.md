@@ -53,3 +53,4 @@ Shift clicking the background will allow you to reposition the window.
 ## TODO (No guarantees)
 - Config to exclude skillchain damage or display skillchains as their own category
 - Log saving to disk
+- Setting to reset on every kill
