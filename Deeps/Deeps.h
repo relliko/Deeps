@@ -25,7 +25,8 @@
 /**
  * @brief Required includes for an extension.
  */
-#include "C:\code\Ashita-v4beta\plugins\sdk\Ashita.h"
+// #include "C:\code\Ashita-v4beta\plugins\sdk\Ashita.h"
+#include "D:\HorizonXI\Game\plugins\sdk\Ashita.h"
 #include <algorithm>
 #include <functional>
 #include <list>
@@ -77,6 +78,7 @@ private:
     //damage.cpp
     uint16_t GetIndexFromId(int id);
     source_t* GetDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID, bool isPet);
+    bool IsParsedActionType(uint8_t actionType);
     bool UpdateDamageSource(source_t* source, uint16_t message, uint32_t damage);
 
     //main.cpp

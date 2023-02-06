@@ -69,6 +69,29 @@ enum SPECEFFECT
     SPECEFFECT_CRITICAL_HIT = 0x22
 };
 
+enum ACTIONTYPE
+{
+    ACTIONTYPE_MELEE            = 0x01,
+    ACTIONTYPE_RA_FINISH        = 0x02,
+    ACTIONTYPE_WS_FINISH        = 0x03,
+    ACTIONTYPE_CAST_FINISH      = 0x04,
+    ACTIONTYPE_ITEM_FINISH      = 0x05,
+    ACTIONTYPE_JA               = 0x06,
+    ACTIONTYPE_WS_START         = 0x07,
+    ACTIONTYPE_CAST_START       = 0x08,
+    ACTIONTYPE_ITEM_START       = 0x09,
+    ACTIONTYPE_NPC_TP_FINISH    = 0x0B,
+    ACTIONTYPE_RA_START         = 0x0C,
+    ACTIONTYPE_AVATAR_BP_FINISH = 0x0D,
+    ACTIONTYPE_JA_DNC           = 0x0E,
+    ACTIONTYPE_JA_RUN           = 0x0F
+};
+
+enum MESSAGE
+{
+    MSG_ADD_EFFECT_DMG = 163,
+    MSG_ADD_EFFECT_DMG2 = 229,
+};
 
 // holds details about a specific damage source
 struct damage_t
@@ -100,9 +123,11 @@ struct source_t
 {
     std::string name;
     std::map<const char*, damage_t> damage;
+    bool isMagic; // Used to ignore this source while getting hit rates
 
     source_t()
     {
+        isMagic = false;
     }
 
     uint64_t total() const
@@ -149,7 +174,7 @@ struct entitysources_t
     std::string name; // Player name
     uint32_t color;   // A player's bar color
     uint32_t id;
-    uint32_t ownerid;   // Player's pet ID if they have one
+    uint32_t ownerid;   // Pet's owner ID; NULL if not a pet entity
     std::map<uint32_t, source_t> sources;
 
     // Returns total damage dealt
@@ -170,7 +195,7 @@ struct entitysources_t
         uint64_t totalMiss  = 0;
         for (auto s : sources)
         {
-            if (s.second.name != "Skillchain" && s.second.name != "Pet")
+            if (s.second.name != "Skillchain" && s.second.name != "Pet" && !s.second.isMagic)
             {
                 totalCount += s.second.getCount();
                 totalMiss += s.second.getMissed();

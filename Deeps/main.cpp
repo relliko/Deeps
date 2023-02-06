@@ -55,7 +55,7 @@ const char* Deeps::GetName(void) const
 
 double Deeps::GetVersion(void) const
 {
-    return 1.05f;
+    return 1.06f;
 }
 
 /**

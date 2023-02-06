@@ -384,7 +384,7 @@ uint32_t Deeps::CheckColorSetting(uint32_t id, uint32_t randomColor)
         if (party->GetMemberServerId(i) == id)
         {
             auto job = party->GetMemberMainJob(i);
-            if (job > 0)
+            if (job >= 0)
                 return JobColors[job];
             break;
         }

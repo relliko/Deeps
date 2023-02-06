@@ -36,15 +36,16 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
 
     if (id == 0x28) //action
     {
-        uint8_t actionNum  = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 182, 4));
         uint8_t targetNum  = Read8(data, 0x09);
         uint8_t actionType = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 82, 4));
         uint16_t actionID = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 86, 10));
+        uint8_t actionNum  = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 182, 4));
         uint32_t userID   = Read32(data, 0x05);
         uint16_t startBit = 150;
         uint16_t damage   = 0;
+        uint16_t index = GetIndexFromId(userID);
 
-        if (userID == 0 || actionType == 0 || actionID == 0)
+        if (userID == 0 || index == 0 || actionType == 0 || actionID == 0)
         {
             return false;
         }
@@ -55,7 +56,6 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
         {
             entityInfo = &it->second;
             // Check this entity for a pet and creates an entitysource_t for it if necessary
-            uint16_t index = GetIndexFromId(userID);
             uint16_t petIndex = m_AshitaCore->GetMemoryManager()->GetEntity()->GetPetTargetIndex(index);
             uint32_t petID = m_AshitaCore->GetMemoryManager()->GetEntity()->GetServerId(petIndex);
 
@@ -72,27 +72,24 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
         }
         else // new entity being stored
         {
-            uint16_t index = GetIndexFromId(userID);
-            if (index != 0)
+            // Ignoring NPCs
+            if (userID > 0x1000000)
             {
-                // Ignoring NPCs
-                if (userID > 0x1000000)
-                {
-                    return false;
-                }
-                entitysources_t newInfo;
-                auto name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(index);
-                newInfo.name        = name != nullptr ? name : "(Unknown)";
-                newInfo.color       = RandomColors[rand() % RandomColors.size()];
-                newInfo.id          = userID;
-                newInfo.ownerid     = NULL;
-                entityInfo          = &m_Entities.insert(std::make_pair(userID, newInfo)).first->second;
-
+                return false;
             }
+            entitysources_t newInfo;
+            auto name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(index);
+            newInfo.name        = name != nullptr ? name : "(Unknown)";
+            newInfo.color       = RandomColors[rand() % RandomColors.size()];
+            newInfo.id          = userID;
+            newInfo.ownerid     = NULL;
+            entityInfo          = &m_Entities.insert(std::make_pair(userID, newInfo)).first->second;
+
             if (m_Debug)
             {
                 m_AshitaCore->GetChatManager()->Writef(-3, false, "Total entities: %d", m_Entities.size());
             }
+
         }
 
         if (entityInfo)
@@ -111,6 +108,13 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
             // When the entity is a pet, swap the entityInfo with its owner to count its damage towards them.
             if (isPet)
             {
+                // Checking/updating the owner of this pet regularly as the ID can end up on another player if two players resummon pets.
+                auto petOwnerIndex = m_AshitaCore->GetMemoryManager()->GetEntity()->GetTrustOwnerTargetIndex(index);
+                if (petOwnerIndex != 0)
+                {
+                    entityInfo->ownerid = m_AshitaCore->GetMemoryManager()->GetEntity()->GetServerId(petOwnerIndex);
+                }
+                // Swapping this pets entityInfo out for its owners to count the damage towards them instead.
                 auto it = m_Entities.find(entityInfo->ownerid);
                 if (it != m_Entities.end())
                 {
@@ -122,53 +126,64 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
                 }
             }
 
-            if ((actionType >= 1 && actionType <= 4) || (actionType == 6) || (actionType == 11) || (actionType == 13) || (actionType == 14) || (actionType == 15))
+            if (IsParsedActionType(actionType))
             {
                 if (actionID == 0)
                     return false;
                 source_t* source   = GetDamageSource(entityInfo, actionType, actionID, isPet);
-                uint16_t messageID = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 80, 10));
 
                 uint32_t addEffectDamage = 0;
                 uint8_t addEffectCount   = 0;
                 uint16_t addMessageID    = 0;
+
                 for (int i = 0; i < targetNum; i++)
                 {
                     for (int j = 0; j < actionNum; j++)
                     {
-                        uint8_t reaction    = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 36, 5));
-                        uint16_t animation  = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 41, 12));
-                        uint32_t mainDamage = (uint32_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 63, 17));
-                        uint8_t speceffect  = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 53, 9));
-
+                        // Unpacking an action packet
+                        uint8_t reaction       = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 36, 5));
+                        uint16_t animation     = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 41, 12));
+                        uint8_t specEffect     = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 53, 7));
+                        // uint8_t knockback      = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 60, 3));
+                        uint32_t mainDamage    = (uint32_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 63, 17));
+                        uint16_t messageID     = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 80, 10));
+                        uint16_t spikesEffect  = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 127, 10));
+                        uint16_t spikesDamage  = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 137, 14));
+                        uint16_t spikesMessage = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 151, 10));
                         if (m_Debug)
                         {
                             m_AshitaCore->GetChatManager()->Writef(-3, false, "Reaction: %d Animation: %d", reaction, animation);
-                            m_AshitaCore->GetChatManager()->Writef(-3, false, "Speceffect: %d Param: %d", speceffect, mainDamage);
+                            m_AshitaCore->GetChatManager()->Writef(-3, false, "SpecEffect: %d Param: %d", specEffect, mainDamage);
                         }
 
                         //Daken (ranged attack on attack)
-                        if (actionType == 1 && animation == 4)
+                        if (actionType == ACTIONTYPE_MELEE && animation == 4)
                             source = GetDamageSource(entityInfo, actionType + 1, actionID, isPet);
 
                         if (!UpdateDamageSource(source, messageID, mainDamage))
                             return false;
 
-                        if ((Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1) && actionType != 6)
+                        // if (spikesEffect != 0)
+                        // {
+                        //     m_AshitaCore->GetChatManager()->Writef(-3, false, "spikesEffect: %d spikesDamage: %d, spikesMessage: %d", spikesEffect, spikesDamage, spikesMessage);
+                        // }
+
+                        // BEGIN additional effect and skillchain damage
+                        if ((Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1) && actionType != ACTIONTYPE_JA)
                         {
                             addMessageID = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 149, 10));
-                            if (addMessageID == 163 || addMessageID == 229 || (addMessageID >= 288 && addMessageID <= 302))
+                            if (addMessageID == MSG_ADD_EFFECT_DMG || addMessageID == MSG_ADD_EFFECT_DMG2 || (addMessageID >= 288 && addMessageID <= 302))
                             {
                                 addEffectDamage = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 132, 16));
+
                                 uint32_t key    = 0;
-                                if (addMessageID == 163 || addMessageID == 229)
-                                    key = 1 << 8;
+                                if (addMessageID == MSG_ADD_EFFECT_DMG || addMessageID == MSG_ADD_EFFECT_DMG2)
+                                    key = 1 << 8; // additional effect key
                                 else
-                                    key = 2 << 8;
-                                auto sourcesIt = entityInfo->sources.find(key);
+                                    key = 2 << 8; // skillchain key
 
                                 source_t* source;
-
+                                auto sourcesIt = entityInfo->sources.find(key);
                                 if (sourcesIt != entityInfo->sources.end())
                                 {
                                     source = &sourcesIt->second;
@@ -180,7 +195,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
                                     {
                                         newsource.name.append("Additional Effect");
                                     }
-                                    else
+                                    else // key == 2 << 8
                                     {
                                         newsource.name.append("Skillchain");
                                     }
@@ -196,6 +211,8 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
 
                             startBit += 37;
                         }
+                        // END additional effect and skillchain damage
+
                         startBit += 1;
                         if (Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1)
                         {
@@ -211,6 +228,22 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
     return false;
 }
 
+
+// Returns true if given actionType matches one of the ones we're parsing
+bool Deeps::IsParsedActionType(uint8_t actionType)
+{
+    return ((actionType == ACTIONTYPE_MELEE)            ||
+            (actionType == ACTIONTYPE_RA_FINISH)        ||
+            (actionType == ACTIONTYPE_WS_FINISH)        ||
+            (actionType == ACTIONTYPE_CAST_FINISH)      ||
+            (actionType == ACTIONTYPE_JA)               ||
+            (actionType == ACTIONTYPE_NPC_TP_FINISH)    ||
+            (actionType == ACTIONTYPE_AVATAR_BP_FINISH) ||
+            (actionType == ACTIONTYPE_JA_DNC)           ||
+            (actionType == ACTIONTYPE_JA_RUN));
+}
+
+
 uint16_t Deeps::GetIndexFromId(int id)
 {
     auto entMgr = m_AshitaCore->GetMemoryManager()->GetEntity();
@@ -225,8 +258,7 @@ uint16_t Deeps::GetIndexFromId(int id)
 source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID, bool isPet)
 {
     uint32_t key;
-    // Differentiating keys for pets so their damage is in its own category
-    if (isPet)
+    if (isPet) // All pet attacks are going into a "Pet" damage source
     {
         key = 0xBADC0DE;
     }
@@ -254,23 +286,24 @@ source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType
         {
             source->name.append("Pet");
         }
-        else if (actionType == 1)
+        else if (actionType == ACTIONTYPE_MELEE)
         {
             source->name.append("Attack");
         }
-        else if (actionType == 2)
+        else if (actionType == ACTIONTYPE_RA_FINISH)
         {
             source->name.append("Ranged Attack");
         }
-        else if (actionType == 3 || actionType == 11)
+        else if (actionType == ACTIONTYPE_WS_FINISH || actionType == ACTIONTYPE_NPC_TP_FINISH)
         {
             source->name.append(m_AshitaCore->GetResourceManager()->GetAbilityById(actionID)->Name[2]);
         }
-        else if (actionType == 4)
+        else if (actionType == ACTIONTYPE_CAST_FINISH)
         {
             source->name.append(m_AshitaCore->GetResourceManager()->GetSpellById(actionID)->Name[2]);
+            source->isMagic = true;
         }
-        else if (actionType == 6 || actionType == 14 || actionType == 15)
+        else if (actionType == ACTIONTYPE_JA || actionType == ACTIONTYPE_JA_DNC || actionType == ACTIONTYPE_JA_RUN)
         {
             source->name.append(m_AshitaCore->GetResourceManager()->GetAbilityById(actionID + 512)->Name[2]);
         }
@@ -278,6 +311,15 @@ source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType
     return source;
 }
 
+/**
+ * @brief Updates the total, count, and min/max values for a damage source.
+ *
+ * @param source The source_t to update
+ * @param message The message ID from an incoming action packet
+ * @param damage The damage value from an incoming action packet
+ * @return true
+ * @return false
+ */
 bool Deeps::UpdateDamageSource(source_t* source, uint16_t message, uint32_t damage)
 {
     damage_t* type = NULL;
