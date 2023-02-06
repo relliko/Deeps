@@ -33,6 +33,11 @@ Shift clicking the background will allow you to reposition the window.
 
 ## Patch Notes
 
+### v1.06
+- Hopefully fixed pet damage ending up associated with the wrong owner after resummoning.
+- Fixed colors being random when someone is /anon, now it is consistently blue.
+- Spells no longer affect overall hit rate
+
 ### v1.05
 - Fixed SMN blood pacts not being included in pet damage
 - Added /dps tvmode to scale the size up by 50% so it's easier to look at on big screens.
