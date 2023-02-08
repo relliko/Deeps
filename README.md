@@ -37,6 +37,7 @@ Shift clicking the background will allow you to reposition the window.
 ## Patch Notes
 
 ### v1.06
+- Added a toggle to disable skillchains counting towards a player's damage contribution.
 - Hopefully fixed pet damage ending up associated with the wrong owner after resummoning.
 - Fixed colors being random when someone is /anon, now it is consistently blue.
 - Spells no longer affect overall hit rate

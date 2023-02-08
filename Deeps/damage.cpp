@@ -147,9 +147,10 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
                         // uint8_t knockback      = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 60, 3));
                         uint32_t mainDamage    = (uint32_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 63, 17));
                         uint16_t messageID     = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 80, 10));
-                        uint16_t spikesEffect  = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 127, 10));
-                        uint16_t spikesDamage  = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 137, 14));
-                        uint16_t spikesMessage = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 151, 10));
+
+                        uint8_t hasAdditionalEffect = Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1;
+                        uint8_t hasSpikesEffect = Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1;
+
                         if (m_Debug)
                         {
                             m_AshitaCore->GetChatManager()->Writef(-3, false, "Reaction: %d Animation: %d", reaction, animation);
@@ -163,24 +164,25 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
                         if (!UpdateDamageSource(source, messageID, mainDamage))
                             return false;
 
-                        // if (spikesEffect != 0)
-                        // {
-                        //     m_AshitaCore->GetChatManager()->Writef(-3, false, "spikesEffect: %d spikesDamage: %d, spikesMessage: %d", spikesEffect, spikesDamage, spikesMessage);
-                        // }
-
                         // BEGIN additional effect and skillchain damage
-                        if ((Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1) && actionType != ACTIONTYPE_JA)
+                        if (hasAdditionalEffect && actionType != ACTIONTYPE_JA)
                         {
+                            addEffectDamage = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 132, 16));
                             addMessageID = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 149, 10));
-                            if (addMessageID == MSG_ADD_EFFECT_DMG || addMessageID == MSG_ADD_EFFECT_DMG2 || (addMessageID >= 288 && addMessageID <= 302))
+                            bool isSC = (addMessageID >= 288 && addMessageID <= 302); // 288-302 are skillchain messages
+
+                            if (addMessageID == MSG_ADD_EFFECT_DMG || addMessageID == MSG_ADD_EFFECT_DMG2 || (isSC && m_CountSkillchains))
                             {
-                                addEffectDamage = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 132, 16));
 
                                 uint32_t key    = 0;
                                 if (addMessageID == MSG_ADD_EFFECT_DMG || addMessageID == MSG_ADD_EFFECT_DMG2)
+                                {
                                     key = 1 << 8; // additional effect key
+                                }
                                 else
+                                {
                                     key = 2 << 8; // skillchain key
+                                }
 
                                 source_t* source;
                                 auto sourcesIt = entityInfo->sources.find(key);
@@ -202,6 +204,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
 
                                     sourcesIt = entityInfo->sources.insert(std::make_pair(key, newsource)).first;
                                     source    = &sourcesIt->second;
+
                                 }
                                 source->damage["Hit"].count += 1;
                                 source->damage["Hit"].total += addEffectDamage;
@@ -214,7 +217,7 @@ bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data
                         // END additional effect and skillchain damage
 
                         startBit += 1;
-                        if (Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1)
+                        if (hasSpikesEffect)
                         {
                             startBit += 34;
                         }

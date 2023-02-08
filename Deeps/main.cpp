@@ -94,6 +94,7 @@ bool Deeps::Initialize(IAshitaCore* core, ILogManager* log, uint32_t id)
 	this->m_AshitaCore = core;
 	this->m_PluginId = id;
 	this->m_LogManager = log;
+    this->m_LastRender = clock();
     srand(time(NULL));
     m_CharInfo = 0;
 	m_AshitaCore->GetConfigurationManager()->Load("Deeps", "Deeps");
@@ -200,6 +201,12 @@ bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
                 m_AshitaCore->GetChatManager()->Writef(0, false, "%s%s", Ashita::Chat::Header("Deeps").c_str(), Ashita::Chat::Message(m_TVMode ? "TV Mode Enabled" : "TV Mode Disabled").c_str());
                 return true;
             }
+            else if (args[1] == "sc")
+            {
+                m_CountSkillchains = !m_CountSkillchains;
+                m_AshitaCore->GetChatManager()->Writef(0, false, "%s%s", Ashita::Chat::Header("Deeps").c_str(), Ashita::Chat::Message(m_CountSkillchains ? "Skillchain Damage Enabled" : "Skillchain Damage Disabled").c_str());
+                return true;
+            }
         }
         std::stringstream out;
         out << Ashita::Chat::Header("Deeps");
@@ -229,6 +236,11 @@ bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
         out << Ashita::Chat::Header("Deeps");
         out << Ashita::Chat::Color2(2, "/dps tvmode");
         out << Ashita::Chat::Message(" - Scales Deeps up to a size that works better on large displays. Note: This resets the current combat data.");
+        m_AshitaCore->GetChatManager()->Write(0, false, out.str().c_str());
+        out = std::stringstream();
+        out << Ashita::Chat::Header("Deeps");
+        out << Ashita::Chat::Color2(2, "/dps sc");
+        out << Ashita::Chat::Message(" - Toggles skillchain contribution to player damage on or off");
         m_AshitaCore->GetChatManager()->Write(0, false, out.str().c_str());
         return true;
     }

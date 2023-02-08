@@ -37,6 +37,7 @@ void Deeps::Direct3DRelease(void)
     m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "guipos", "xpos", std::to_string(m_Background->GetPositionX()).c_str());
     m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "guipos", "ypos", std::to_string(m_Background->GetPositionY()).c_str());
     m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "tvmode", "enabled", std::to_string(m_TVMode).c_str());
+    m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "sc", "enabled", std::to_string(m_CountSkillchains).c_str());
     m_AshitaCore->GetConfigurationManager()->Save("Deeps", "Deeps");
 
     m_AshitaCore->GetFontManager()->Delete(m_Background->GetAlias());
@@ -70,6 +71,7 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
     float ypos = m_AshitaCore->GetConfigurationManager()->GetFloat("Deeps", "guipos", "ypos", 300.0f);
     m_TVMode = m_AshitaCore->GetConfigurationManager()->GetBool("Deeps", "tvmode", "enabled", false);
     m_GUIScale = m_AshitaCore->GetConfigurationManager()->GetBool("Deeps", "tvmode", "enabled", false) ? 1.5f : 1.0f;
+    m_CountSkillchains = m_AshitaCore->GetConfigurationManager()->GetBool("Deeps", "sc", "enabled", true);
 
     m_Background = m_AshitaCore->GetFontManager()->Create("DeepsBackground");
     m_Background->SetFontFamily("Arial");
@@ -94,6 +96,13 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
 
 void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion)
 {
+
+    clock_t now = clock();
+    if (!(now - m_LastRender > 0.1*CLOCKS_PER_SEC))
+    {
+        return;
+    }
+
     // Making sure the background heights and widths are good for when the size toggle is switched
     m_Background->SetFontHeight(TITLE_FONT_HEIGHT * m_GUIScale);
     m_Background->GetBackground()->SetWidth(WINDOW_WIDTH * m_GUIScale);
@@ -217,6 +226,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
         }
     }
     m_Background->GetBackground()->SetHeight(m_Bars.size() * (BAR_BACKGROUND_HEIGHT * m_GUIScale) + (TITLEBAR_HEIGHT * m_GUIScale));
+    m_LastRender = clock();
 }
 
 /**

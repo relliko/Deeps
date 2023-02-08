@@ -57,6 +57,7 @@ class Deeps : IPlugin
     bool                  m_PartyOnly;
     bool                  m_TVMode;
     float                 m_GUIScale;
+    bool                  m_CountSkillchains;
 
     // Packet Deduplication reference
 	std::list<void*>	  m_Packets;
@@ -73,6 +74,8 @@ class Deeps : IPlugin
     bool                  m_Drag;
     int32_t               m_LastX;
     int32_t               m_LastY;
+
+    std::clock_t          m_LastRender;
 
 private:
     //damage.cpp
