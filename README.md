@@ -29,15 +29,15 @@ Shift clicking the background will allow you to reposition the window.
 - Overall hit rating displayed alongside damage done
 
 ## Known issues
+- Spikes damage, counters, reprisal procs do not count currently.
 - High jump displays as Avalanche and Jump displays as Gale axe
 - Report only shows top 4
 - Missing the first swing of attack rounds may not include the rest of the rounds damage
-- If multiple pets are in a party and people summon and dismiss them the pet damage may end up tied to the wrong player. Recommended to reset if pets are changed around a lot.
 
 ## Patch Notes
 
 ### v1.06
-- Added a toggle to disable skillchains counting towards a player's damage contribution.
+- Added a configuration setting (`/dps sc`) to disable skillchains counting towards a player's damage contribution.
 - Hopefully fixed pet damage ending up associated with the wrong owner after resummoning.
 - Fixed colors being random when someone is /anon, now it is consistently blue.
 - Spells no longer affect overall hit rate
