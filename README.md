@@ -29,6 +29,7 @@ Shift clicking the background will allow you to reposition the window.
 - Overall hit rating displayed alongside damage done
 
 ## Known issues
+- Settings may not save under certain conditions. To remedy this, change your settings and then `/unload deeps`, it should then save.
 - Additional effects contribute towards overall accuracy
 - Spikes damage, counters, reprisal procs do not count currently.
 - High jump displays as Avalanche and Jump displays as Gale axe
