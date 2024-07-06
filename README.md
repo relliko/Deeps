@@ -34,7 +34,7 @@ Shift clicking the background will allow you to reposition the window.
 - Spikes damage, counters, reprisal procs do not count currently.
 - High jump displays as Avalanche and Jump displays as Gale axe
 - Report only shows top 4
-- Missing the first swing of attack rounds may not include the rest of the rounds damage
+- ~~Missing the first swing of attack rounds may not include the rest of the rounds damage~~ I haven't seen any real evidence of this. If you have it, show me.
 
 ## Patch Notes
 
