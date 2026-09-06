@@ -16,15 +16,45 @@
 */
 
 #include "Deeps.h"
-//Global pointer for callback to use
+namespace
+{
+std::mutex g_ClickMutex;
+std::condition_variable g_ClickDrained;
 Deeps* g_Deeps = NULL;
+std::size_t g_ClicksInFlight = 0;
+}
 
 /**
  * Global function to serve as mouse callback
  */
 BOOL __stdcall g_OnClick(uint32_t uMsg, WPARAM wParam, LPARAM lParam, bool handled)
 {
-    return g_Deeps->OnClick(uMsg, wParam, lParam, handled);
+    Deeps* deeps = NULL;
+    {
+        std::lock_guard<std::mutex> lock(g_ClickMutex);
+        deeps = g_Deeps;
+        if (deeps == NULL)
+            return FALSE;
+        ++g_ClicksInFlight;
+    }
+
+    BOOL result = FALSE;
+    try
+    {
+        result = deeps->OnClick(uMsg, wParam, lParam, handled);
+    }
+    catch (...)
+    {
+        // Never let an exception cross the host's C callback boundary. The
+        // in-flight guard still has to drain before teardown can continue.
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_ClickMutex);
+        --g_ClicksInFlight;
+        if (g_ClicksInFlight == 0)
+            g_ClickDrained.notify_all();
+    }
+    return result;
 }
 
 /**
@@ -32,20 +62,43 @@ BOOL __stdcall g_OnClick(uint32_t uMsg, WPARAM wParam, LPARAM lParam, bool handl
  */
 void Deeps::Direct3DRelease(void)
 {
-    m_AshitaCore->GetInputManager()->GetMouse()->RemoveCallback("deeps_click");
+    if (m_AshitaCore == NULL)
+        return;
+    auto input = m_AshitaCore->GetInputManager();
+    if (input != NULL && input->GetMouse() != NULL)
+        input->GetMouse()->RemoveCallback("deeps_click");
 
-    m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "guipos", "xpos", std::to_string(m_Background->GetPositionX()).c_str());
-    m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "guipos", "ypos", std::to_string(m_Background->GetPositionY()).c_str());
-    m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "tvmode", "enabled", std::to_string(m_TVMode).c_str());
-    m_AshitaCore->GetConfigurationManager()->SetValue("Deeps", "sc", "enabled", std::to_string(m_CountSkillchains).c_str());
-    m_AshitaCore->GetConfigurationManager()->Save("Deeps", "Deeps");
+    // Remove the callback without holding the guard: the host may wait for a
+    // callback that needs the same mutex. Then prevent new acquisitions and
+    // drain callbacks that already acquired this object's lifetime.
+    {
+        std::unique_lock<std::mutex> lock(g_ClickMutex);
+        if (g_Deeps == this)
+            g_Deeps = NULL;
+        g_ClickDrained.wait(lock, []() { return g_ClicksInFlight == 0; });
+    }
 
-    m_AshitaCore->GetFontManager()->Delete(m_Background->GetAlias());
+    auto config = m_AshitaCore->GetConfigurationManager();
+    if (config != NULL && m_Background != NULL)
+    {
+        config->SetValue("Deeps", "guipos", "xpos", std::to_string(m_Background->GetPositionX()).c_str());
+        config->SetValue("Deeps", "guipos", "ypos", std::to_string(m_Background->GetPositionY()).c_str());
+        config->SetValue("Deeps", "tvmode", "enabled", std::to_string(m_TVMode).c_str());
+        config->SetValue("Deeps", "sc", "enabled", std::to_string(m_CountSkillchains).c_str());
+        config->Save("Deeps", "Deeps");
+    }
+
+    auto fonts = m_AshitaCore->GetFontManager();
+    if (fonts != NULL && m_Background != NULL)
+        fonts->Delete(m_Background->GetAlias());
+    m_Background = NULL;
+    m_ClickMap.clear();
 
     while (!m_Bars.empty())
     {
         auto bar = m_Bars.back();
-        m_AshitaCore->GetFontManager()->Delete(bar->GetAlias());
+        if (fonts != NULL && bar != NULL)
+            fonts->Delete(bar->GetAlias());
         m_Bars.pop_back();
     }
 }
@@ -63,9 +116,12 @@ void Deeps::Direct3DRelease(void)
  */
 bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
 {
+    if (device == NULL || m_AshitaCore == NULL || m_AshitaCore->GetConfigurationManager() == NULL ||
+        m_AshitaCore->GetFontManager() == NULL || m_AshitaCore->GetInputManager() == NULL ||
+        m_AshitaCore->GetInputManager()->GetMouse() == NULL)
+        return false;
     this->m_Direct3DDevice = device;
     m_Drag                 = false;
-    g_Deeps                = this;
 
     float xpos = m_AshitaCore->GetConfigurationManager()->GetFloat("Deeps", "guipos", "xpos", 300.0f);
     float ypos = m_AshitaCore->GetConfigurationManager()->GetFloat("Deeps", "guipos", "ypos", 300.0f);
@@ -74,6 +130,8 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
     m_CountSkillchains = m_AshitaCore->GetConfigurationManager()->GetBool("Deeps", "sc", "enabled", true);
 
     m_Background = m_AshitaCore->GetFontManager()->Create("DeepsBackground");
+    if (m_Background == NULL || m_Background->GetBackground() == NULL)
+        return false;
     m_Background->SetFontFamily("Arial");
     m_Background->SetFontHeight(TITLE_FONT_HEIGHT * m_GUIScale);
     m_Background->SetAutoResize(false);
@@ -89,6 +147,10 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
     m_Background->SetPositionY(ypos);
     m_Background->SetVisible(true);
 
+    {
+        std::lock_guard<std::mutex> lock(g_ClickMutex);
+        g_Deeps = this;
+    }
     m_AshitaCore->GetInputManager()->GetMouse()->AddCallback("deeps_click", g_OnClick);
 
     return true;
@@ -96,7 +158,8 @@ bool Deeps::Direct3DInitialize(IDirect3DDevice8* device)
 
 void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion)
 {
-
+    if (m_Background == NULL || m_Background->GetBackground() == NULL)
+        return;
     clock_t now = clock();
     if (!(now - m_LastRender > 0.1*CLOCKS_PER_SEC))
     {
@@ -136,7 +199,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
             bar->GetBackground()->SetColor(this->CheckColorSetting(iter->id, iter->color));
             char string[256];
             sprintf_s(string, 256, " %d. %-10.10s %6llu (%03.1f%%)  -  Hit: %03.1f%% \n",
-                i + 1, iter->name.c_str(), iter->total(), total == 0 ? 0 : 100 * ((float)iter->total() / (float)total), iter->hitrate());
+                i + 1, iter->name.c_str(), static_cast<unsigned long long>(iter->total()), total == 0 ? 0 : 100 * ((float)iter->total() / (float)total), iter->hitrate());
             bar->SetText(string);
             m_ClickMap.insert(std::pair<IFontObject*, std::string>(bar, iter->name));
             i++;
@@ -176,7 +239,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                     bar->GetBackground()->SetColor(this->CheckColorSetting(it->first, it->second.color));
                     char string[256];
                     sprintf_s(string, 256, " %d. %-10.10s %6llu (%03.1f%%)\n",
-                        i + 1, s.name.c_str(), s.total(), total == 0 ? 0 : 100 * ((float)s.total() / (float)total));
+                        i + 1, s.name.c_str(), static_cast<unsigned long long>(s.total()), total == 0 ? 0 : 100 * ((float)s.total() / (float)total));
                     bar->SetText(string);
                     m_ClickMap.insert(std::pair<IFontObject*, std::string>(bar, s.name));
                     i++;
@@ -188,7 +251,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                 {
                     if (s.second.name == m_SourceInfo)
                     {
-                        std::vector<std::pair<const char*, damage_t>> temp;
+                        std::vector<std::pair<std::string, damage_t>> temp;
                         uint32_t count = 0;
                         for (const auto d : s.second.damage)
                         {
@@ -199,7 +262,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                             }
                         }
 
-                        std::sort(temp.begin(), temp.end(), [](std::pair<const char*, damage_t> a, std::pair<const char*, damage_t> b) { return a.second > b.second; });
+                        std::sort(temp.begin(), temp.end(), [](const std::pair<std::string, damage_t>& a, const std::pair<std::string, damage_t>& b) { return a.second > b.second; });
                         char string[256];
                         sprintf_s(string, 256, " %s - %s\n", it->second.name.c_str(), s.second.name.c_str());
                         m_Background->SetText(string);
@@ -215,7 +278,7 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
                             bar->GetBackground()->SetWidth((BAR_WIDTH * m_GUIScale) * (count == 0 ? 1 : 1 * ((float)s.second.count / (float)max)));
                             bar->GetBackground()->SetColor(this->CheckColorSetting(it->first, it->second.color));
                             char string[256];
-                            sprintf_s(string, 256, " %-5sCnt:%4d  Avg:%5d  Max:%5d (%3.1f%%)\n", s.first, s.second.count, s.second.avg(), s.second.max, count == 0 ? 0 : 100 * ((float)s.second.count / (float)count));
+                            sprintf_s(string, 256, " %-5sCnt:%4u  Avg:%5u  Max:%5u (%3.1f%%)\n", s.first.c_str(), s.second.count, s.second.avg(), s.second.max, count == 0 ? 0 : 100 * ((float)s.second.count / (float)count));
                             bar->SetText(string);
                             i++;
                         }
@@ -238,13 +301,14 @@ void Deeps::Direct3DPresent(const RECT* pSourceRect, const RECT* pDestRect, HWND
 void Deeps::RepairBars(IFontObject* deepsBase, uint8_t size)
 {
     auto barCount = m_Bars.size();
-    auto limit    = max(size, barCount);
     while (m_Bars.size() < size)
     {
         barCount = m_Bars.size();
         char buffer[256];
-        sprintf_s(buffer, 256, "DeepsBar%d", barCount);
+        sprintf_s(buffer, 256, "DeepsBar%u", static_cast<unsigned int>(barCount));
         auto newBar = m_AshitaCore->GetFontManager()->Create(buffer);
+        if (newBar == NULL || newBar->GetBackground() == NULL)
+            return;
         newBar->SetAutoResize(false);
         newBar->SetFontFamily("Arial");
         if (m_TVMode)
@@ -287,6 +351,8 @@ void Deeps::RepairBars(IFontObject* deepsBase, uint8_t size)
 
 bool Deeps::OnClick(uint32_t uMsg, WPARAM wParam, LPARAM lParam, bool handled)
 {
+    if (m_Background == NULL || m_Background->GetBackground() == NULL)
+        return false;
     int32_t xpos = GET_X_LPARAM(lParam);
     int32_t ypos = GET_Y_LPARAM(lParam);
 
@@ -384,17 +450,18 @@ bool Deeps::HitTestBar(IFontObject* bar, int32_t x, int32_t y)
 
 uint32_t Deeps::CheckColorSetting(uint32_t id, uint32_t randomColor)
 {
-    if (this->m_JobColors == false)
+    if (this->m_JobColors == false || m_AshitaCore == NULL || m_AshitaCore->GetMemoryManager() == NULL)
         return randomColor;
 
-    // Check if we have an available job for the player (Job can be 0 if person is anon!!)
     IParty* party = m_AshitaCore->GetMemoryManager()->GetParty();
+    if (party == NULL)
+        return randomColor;
     for (auto i = 0; i < 18; i++)
     {
         if (party->GetMemberServerId(i) == id)
         {
             auto job = party->GetMemberMainJob(i);
-            if (job >= 0)
+            if (static_cast<size_t>(job) < JobColors.size())
                 return JobColors[job];
             break;
         }
@@ -406,14 +473,16 @@ bool Deeps::CheckPartySetting(uint32_t id)
 {
     if (this->m_PartyOnly == false)
         return true;
+    if (m_AshitaCore == NULL || m_AshitaCore->GetMemoryManager() == NULL)
+        return false;
 
     IParty* party = m_AshitaCore->GetMemoryManager()->GetParty();
+    if (party == NULL)
+        return false;
     for (auto i = 0; i < 18; i++)
     {
         if (party->GetMemberServerId(i) == id)
-        {
             return true;
-        }
     }
 
     return false;

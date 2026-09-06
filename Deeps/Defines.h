@@ -122,7 +122,7 @@ struct damage_t
 struct source_t
 {
     std::string name;
-    std::map<const char*, damage_t> damage;
+    std::map<std::string, damage_t> damage;
     bool isMagic; // Used to ignore this source while getting hit rates
 
     source_t()
@@ -133,7 +133,7 @@ struct source_t
     uint64_t total() const
     {
         uint64_t tot = 0;
-        for (const auto d : damage)
+        for (const auto& d : damage)
         {
             tot += d.second.total;
         }
@@ -143,7 +143,7 @@ struct source_t
     uint64_t getCount() const
     {
         uint64_t count = 0;
-        for (const auto d : damage)
+        for (const auto& d : damage)
         {
             count += d.second.count;
         }
@@ -153,7 +153,7 @@ struct source_t
     uint64_t getMissed() const
     {
         uint64_t missed = 0;
-        for (const auto d : damage)
+        for (const auto& d : damage)
         {
             if (d.first == "Miss")
             {
@@ -180,8 +180,8 @@ struct entitysources_t
     // Returns total damage dealt
     uint64_t total() const
     {
-        int64_t total = 0;
-        for (auto s : sources)
+        uint64_t total = 0;
+        for (const auto& s : sources)
         {
             total += s.second.total();
         }
@@ -193,7 +193,7 @@ struct entitysources_t
     {
         uint64_t totalCount = 0;
         uint64_t totalMiss  = 0;
-        for (auto s : sources)
+        for (const auto& s : sources)
         {
             if (s.second.name != "Skillchain" && s.second.name != "Pet" && !s.second.isMagic)
             {

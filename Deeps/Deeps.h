@@ -22,19 +22,32 @@
 #pragma once
 #endif
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 /**
  * @brief Required includes for an extension.
  */
-// #include "C:\code\Ashita-v4beta\plugins\sdk\Ashita.h"
-#include "D:\HorizonXI\Game\plugins\sdk\Ashita.h"
+#if __has_include("Ashita.h")
+#include "Ashita.h"
+#elif __has_include("D:\\HorizonXI\\Game\\plugins\\sdk\\Ashita.h")
+#include "D:\\HorizonXI\\Game\\plugins\\sdk\\Ashita.h"
+#else
+#error Ashita SDK headers were not found. Add the SDK directory to the compiler include path.
+#endif
 #include <algorithm>
 #include <functional>
 #include <list>
 #include <map>
 #include <stdint.h>
 #include <thread>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <windowsx.h>
 #include "Defines.h"
+#include "PacketSafety.h"
 
 /**
  * @brief Our Main Plugin Class
@@ -60,7 +73,7 @@ class Deeps : IPlugin
     bool                  m_CountSkillchains;
 
     // Packet Deduplication reference
-	std::list<void*>	  m_Packets;
+	DeepsSafety::PacketHistory m_Packets;
 
     // Display State
     IFontObject*                        m_Background;
@@ -77,6 +90,13 @@ class Deeps : IPlugin
 
     std::clock_t          m_LastRender;
 
+    // Report worker is owned and joined before Ashita objects are released.
+    std::thread           m_ReportThread;
+    std::mutex            m_ReportMutex;
+    std::condition_variable m_ReportWake;
+    std::atomic<bool>     m_StopReport;
+    bool                  m_Released;
+
 private:
     //damage.cpp
     uint16_t GetIndexFromId(int id);
@@ -85,7 +105,8 @@ private:
     bool UpdateDamageSource(source_t* source, uint16_t message, uint32_t damage);
 
     //main.cpp
-    void Report(char mode, int max);
+    void Report(char mode, std::vector<std::string> lines);
+    void StopReport(void);
 
     //render.cpp
     void Direct3DRelease(void);

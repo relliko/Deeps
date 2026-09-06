@@ -14,216 +14,127 @@
  */
 bool Deeps::HandleIncomingPacket(uint16_t id, uint32_t size, const uint8_t* data, uint8_t* modified, uint32_t sizeChunk, const uint8_t* dataChunk, bool injected, bool blocked)
 {
-    for (std::list<void*>::iterator it = m_Packets.begin(); it != m_Packets.end(); it++)
+    if (data == NULL || size == 0)
+        return false;
+
+    if (id != 0x28)
     {
-        if (memcmp(data, (*it), size) == 0)
-        {
-            return false;
-        }
+        m_Packets.Remember(data, size);
+        return false;
     }
 
-    void* packet = malloc(1024);
-    memset(packet, 0, 1024);
-    memcpy(packet, data, size);
-    m_Packets.push_back(packet);
-    while (m_Packets.size() > 200)
-    {
-        free(*m_Packets.begin());
-        m_Packets.pop_front();
-    }
+    // Parse the complete variable-length packet before touching damage state or
+    // deduplication history. A truncated suffix must not partially apply hits.
+    DeepsSafety::ActionPacket packet;
+    if (!DeepsSafety::ParseActionPacket(data, size, packet))
+        return false;
+    if (!m_Packets.Remember(data, size))
+        return false;
+
+    auto memory = m_AshitaCore != NULL ? m_AshitaCore->GetMemoryManager() : NULL;
+    auto entities = memory != NULL ? memory->GetEntity() : NULL;
+    if (entities == NULL)
+        return false;
+    const uint32_t userID = packet.userID;
+    const uint8_t actionType = packet.actionType;
+    const uint16_t actionID = packet.actionID;
+    const uint16_t index = GetIndexFromId(userID);
+    if (userID == 0 || index == 0 || actionType == 0 || actionID == 0)
+        return false;
 
     entitysources_t* entityInfo = NULL;
-
-    if (id == 0x28) //action
+    auto it = m_Entities.find(userID);
+    if (it != m_Entities.end())
     {
-        uint8_t targetNum  = Read8(data, 0x09);
-        uint8_t actionType = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 82, 4));
-        uint16_t actionID = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 86, 10));
-        uint8_t actionNum  = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, 182, 4));
-        uint32_t userID   = Read32(data, 0x05);
-        uint16_t startBit = 150;
-        uint16_t damage   = 0;
-        uint16_t index = GetIndexFromId(userID);
-
-        if (userID == 0 || index == 0 || actionType == 0 || actionID == 0)
+        entityInfo = &it->second;
+        const uint16_t petIndex = entities->GetPetTargetIndex(index);
+        const uint32_t petID = entities->GetServerId(petIndex);
+        if (petIndex > 0 && petID > 0)
         {
+            entitysources_t newPetInfo;
+            auto name = entities->GetName(petIndex);
+            newPetInfo.name = name != nullptr ? name : "(Unknown)";
+            newPetInfo.color = RandomColors[rand() % RandomColors.size()];
+            newPetInfo.id = petID;
+            newPetInfo.ownerid = userID;
+            m_Entities.insert(std::make_pair(petID, newPetInfo));
+        }
+    }
+    else
+    {
+        if (userID > 0x1000000)
             return false;
-        }
-
-        auto it = m_Entities.find(userID);
-
-        if (it != m_Entities.end())
+        entitysources_t newInfo;
+        auto name = entities->GetName(index);
+        newInfo.name = name != nullptr ? name : "(Unknown)";
+        newInfo.color = RandomColors[rand() % RandomColors.size()];
+        newInfo.id = userID;
+        newInfo.ownerid = NULL;
+        entityInfo = &m_Entities.emplace(userID, newInfo).first->second;
+        if (m_Debug)
         {
-            entityInfo = &it->second;
-            // Check this entity for a pet and creates an entitysource_t for it if necessary
-            uint16_t petIndex = m_AshitaCore->GetMemoryManager()->GetEntity()->GetPetTargetIndex(index);
-            uint32_t petID = m_AshitaCore->GetMemoryManager()->GetEntity()->GetServerId(petIndex);
-
-            if (petIndex > 0 && petID > 0)
-            {
-                entitysources_t newPetInfo;
-                auto name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(petIndex);
-                newPetInfo.name        = name != nullptr ? name : "(Unknown)";
-                newPetInfo.color       = RandomColors[rand() % RandomColors.size()];
-                newPetInfo.id          = petID;
-                newPetInfo.ownerid     = userID;
-                m_Entities.insert(std::make_pair(petID, newPetInfo)).first->second;
-            }
+            auto chat = m_AshitaCore->GetChatManager();
+            if (chat != NULL)
+                chat->Writef(-3, false, "Total entities: %u", static_cast<unsigned int>(m_Entities.size()));
         }
-        else // new entity being stored
+    }
+
+    if (entityInfo == NULL)
+        return false;
+    if (m_Debug && m_AshitaCore->GetChatManager() != NULL)
+        m_AshitaCore->GetChatManager()->Writef(-3, false, "Action Type: %d Action ID: %d", actionType, actionID);
+
+    bool isPet = entityInfo->ownerid != NULL;
+    if (isPet)
+    {
+        const auto petOwnerIndex = entities->GetTrustOwnerTargetIndex(index);
+        if (petOwnerIndex != 0)
+            entityInfo->ownerid = entities->GetServerId(petOwnerIndex);
+        auto owner = m_Entities.find(entityInfo->ownerid);
+        if (owner == m_Entities.end())
+            return false;
+        entityInfo = &owner->second;
+    }
+
+    if (!IsParsedActionType(actionType))
+        return false;
+
+    for (const auto& target : packet.targets)
+    {
+        for (const auto& action : target.actions)
         {
-            // Ignoring NPCs
-            if (userID > 0x1000000)
+            source_t* source = GetDamageSource(entityInfo,
+                (actionType == ACTIONTYPE_MELEE && action.animation == 4) ? actionType + 1 : actionType,
+                actionID, isPet);
+            if (source == NULL)
+                continue;
+
+            if (m_Debug && m_AshitaCore->GetChatManager() != NULL)
             {
-                return false;
+                m_AshitaCore->GetChatManager()->Writef(-3, false, "Reaction: %d Animation: %d", action.reaction, action.animation);
+                m_AshitaCore->GetChatManager()->Writef(-3, false, "SpecEffect: %d Param: %d", action.specEffect, action.mainDamage);
             }
-            entitysources_t newInfo;
-            auto name = m_AshitaCore->GetMemoryManager()->GetEntity()->GetName(index);
-            newInfo.name        = name != nullptr ? name : "(Unknown)";
-            newInfo.color       = RandomColors[rand() % RandomColors.size()];
-            newInfo.id          = userID;
-            newInfo.ownerid     = NULL;
-            entityInfo          = &m_Entities.insert(std::make_pair(userID, newInfo)).first->second;
+            UpdateDamageSource(source, action.messageID, action.mainDamage);
 
-            if (m_Debug)
+            if (action.hasAdditionalEffect && actionType != ACTIONTYPE_JA)
             {
-                m_AshitaCore->GetChatManager()->Writef(-3, false, "Total entities: %d", m_Entities.size());
-            }
-
-        }
-
-        if (entityInfo)
-        {
-            if (m_Debug)
-            {
-                m_AshitaCore->GetChatManager()->Writef(-3, false, "Action Type: %d Action ID: %d", actionType, actionID);
-            }
-
-            bool isPet = false;
-            if (entityInfo->ownerid != NULL) // Only a pet entity should have data in this field
-            {
-                isPet = true;
-            }
-
-            // When the entity is a pet, swap the entityInfo with its owner to count its damage towards them.
-            if (isPet)
-            {
-                // Checking/updating the owner of this pet regularly as the ID can end up on another player if two players resummon pets.
-                auto petOwnerIndex = m_AshitaCore->GetMemoryManager()->GetEntity()->GetTrustOwnerTargetIndex(index);
-                if (petOwnerIndex != 0)
+                const bool isSC = action.additionalMessageID >= 288 && action.additionalMessageID <= 302;
+                if (action.additionalMessageID == MSG_ADD_EFFECT_DMG ||
+                    action.additionalMessageID == MSG_ADD_EFFECT_DMG2 || (isSC && m_CountSkillchains))
                 {
-                    entityInfo->ownerid = m_AshitaCore->GetMemoryManager()->GetEntity()->GetServerId(petOwnerIndex);
-                }
-                // Swapping this pets entityInfo out for its owners to count the damage towards them instead.
-                auto it = m_Entities.find(entityInfo->ownerid);
-                if (it != m_Entities.end())
-                {
-                    entityInfo = &it->second;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-
-            if (IsParsedActionType(actionType))
-            {
-                if (actionID == 0)
-                    return false;
-                source_t* source   = GetDamageSource(entityInfo, actionType, actionID, isPet);
-
-                uint32_t addEffectDamage = 0;
-                uint8_t addEffectCount   = 0;
-                uint16_t addMessageID    = 0;
-
-                for (int i = 0; i < targetNum; i++)
-                {
-                    for (int j = 0; j < actionNum; j++)
+                    const uint32_t key = isSC ? (2 << 8) : (1 << 8);
+                    auto sourceIt = entityInfo->sources.find(key);
+                    if (sourceIt == entityInfo->sources.end())
                     {
-                        // Unpacking an action packet
-                        uint8_t reaction       = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 36, 5));
-                        uint16_t animation     = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 41, 12));
-                        uint8_t specEffect     = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 53, 7));
-                        // uint8_t knockback      = (uint8_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 60, 3));
-                        uint32_t mainDamage    = (uint32_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 63, 17));
-                        uint16_t messageID     = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 80, 10));
-
-                        uint8_t hasAdditionalEffect = Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1;
-                        uint8_t hasSpikesEffect = Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 121, 1) & 0x1;
-
-                        if (m_Debug)
-                        {
-                            m_AshitaCore->GetChatManager()->Writef(-3, false, "Reaction: %d Animation: %d", reaction, animation);
-                            m_AshitaCore->GetChatManager()->Writef(-3, false, "SpecEffect: %d Param: %d", specEffect, mainDamage);
-                        }
-
-                        //Daken (ranged attack on attack)
-                        if (actionType == ACTIONTYPE_MELEE && animation == 4)
-                            source = GetDamageSource(entityInfo, actionType + 1, actionID, isPet);
-
-                        if (!UpdateDamageSource(source, messageID, mainDamage))
-                            return false;
-
-                        // BEGIN additional effect and skillchain damage
-                        if (hasAdditionalEffect && actionType != ACTIONTYPE_JA)
-                        {
-                            addEffectDamage = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 132, 16));
-                            addMessageID = (uint16_t)(Ashita::BinaryData::UnpackBitsBE((uint8_t*)data, startBit + 149, 10));
-                            bool isSC = (addMessageID >= 288 && addMessageID <= 302); // 288-302 are skillchain messages
-
-                            if (addMessageID == MSG_ADD_EFFECT_DMG || addMessageID == MSG_ADD_EFFECT_DMG2 || (isSC && m_CountSkillchains))
-                            {
-
-                                uint32_t key    = 0;
-                                if (addMessageID == MSG_ADD_EFFECT_DMG || addMessageID == MSG_ADD_EFFECT_DMG2)
-                                {
-                                    key = 1 << 8; // additional effect key
-                                }
-                                else
-                                {
-                                    key = 2 << 8; // skillchain key
-                                }
-
-                                source_t* source;
-                                auto sourcesIt = entityInfo->sources.find(key);
-                                if (sourcesIt != entityInfo->sources.end())
-                                {
-                                    source = &sourcesIt->second;
-                                }
-                                else
-                                {
-                                    source_t newsource;
-                                    if (key == 1 << 8)
-                                    {
-                                        newsource.name.append("Additional Effect");
-                                    }
-                                    else // key == 2 << 8
-                                    {
-                                        newsource.name.append("Skillchain");
-                                    }
-
-                                    sourcesIt = entityInfo->sources.insert(std::make_pair(key, newsource)).first;
-                                    source    = &sourcesIt->second;
-
-                                }
-                                source->damage["Hit"].count += 1;
-                                source->damage["Hit"].total += addEffectDamage;
-                                source->damage["Hit"].min = (addEffectDamage < source->damage["Hit"].min ? addEffectDamage : source->damage["Hit"].min);
-                                source->damage["Hit"].max = (addEffectDamage > source->damage["Hit"].max ? addEffectDamage : source->damage["Hit"].max);
-                            }
-
-                            startBit += 37;
-                        }
-                        // END additional effect and skillchain damage
-
-                        startBit += 1;
-                        if (hasSpikesEffect)
-                        {
-                            startBit += 34;
-                        }
-                        startBit += 86;
+                        source_t newSource;
+                        newSource.name = isSC ? "Skillchain" : "Additional Effect";
+                        sourceIt = entityInfo->sources.insert(std::make_pair(key, newSource)).first;
                     }
-                    startBit += 36;
+                    damage_t& hit = sourceIt->second.damage["Hit"];
+                    hit.count += 1;
+                    hit.total += action.additionalDamage;
+                    hit.min = action.additionalDamage < hit.min ? action.additionalDamage : hit.min;
+                    hit.max = action.additionalDamage > hit.max ? action.additionalDamage : hit.max;
                 }
             }
         }
@@ -249,7 +160,11 @@ bool Deeps::IsParsedActionType(uint8_t actionType)
 
 uint16_t Deeps::GetIndexFromId(int id)
 {
+    if (m_AshitaCore == NULL || m_AshitaCore->GetMemoryManager() == NULL)
+        return 0;
     auto entMgr = m_AshitaCore->GetMemoryManager()->GetEntity();
+    if (entMgr == NULL)
+        return 0;
     for (int i = 0; i < 0x900; i++)
     {
         if (entMgr->GetServerId(i) == id)
@@ -260,6 +175,8 @@ uint16_t Deeps::GetIndexFromId(int id)
 
 source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType, uint16_t actionID, bool isPet)
 {
+    if (entityInfo == NULL)
+        return NULL;
     uint32_t key;
     if (isPet) // All pet attacks are going into a "Pet" damage source
     {
@@ -299,16 +216,22 @@ source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType
         }
         else if (actionType == ACTIONTYPE_WS_FINISH || actionType == ACTIONTYPE_NPC_TP_FINISH)
         {
-            source->name.append(m_AshitaCore->GetResourceManager()->GetAbilityById(actionID)->Name[2]);
+            auto resources = m_AshitaCore != NULL ? m_AshitaCore->GetResourceManager() : NULL;
+            auto ability = resources != NULL ? resources->GetAbilityById(actionID) : NULL;
+            source->name.append((ability != NULL && ability->Name[2] != NULL) ? ability->Name[2] : "Unknown Ability");
         }
         else if (actionType == ACTIONTYPE_CAST_FINISH)
         {
-            source->name.append(m_AshitaCore->GetResourceManager()->GetSpellById(actionID)->Name[2]);
+            auto resources = m_AshitaCore != NULL ? m_AshitaCore->GetResourceManager() : NULL;
+            auto spell = resources != NULL ? resources->GetSpellById(actionID) : NULL;
+            source->name.append((spell != NULL && spell->Name[2] != NULL) ? spell->Name[2] : "Unknown Spell");
             source->isMagic = true;
         }
         else if (actionType == ACTIONTYPE_JA || actionType == ACTIONTYPE_JA_DNC || actionType == ACTIONTYPE_JA_RUN)
         {
-            source->name.append(m_AshitaCore->GetResourceManager()->GetAbilityById(actionID + 512)->Name[2]);
+            auto resources = m_AshitaCore != NULL ? m_AshitaCore->GetResourceManager() : NULL;
+            auto ability = resources != NULL ? resources->GetAbilityById(actionID + 512) : NULL;
+            source->name.append((ability != NULL && ability->Name[2] != NULL) ? ability->Name[2] : "Unknown Ability");
         }
     }
     return source;
@@ -325,6 +248,8 @@ source_t* Deeps::GetDamageSource(entitysources_t* entityInfo, uint8_t actionType
  */
 bool Deeps::UpdateDamageSource(source_t* source, uint16_t message, uint32_t damage)
 {
+    if (source == NULL)
+        return false;
     damage_t* type = NULL;
     bool val       = false;
     if (std::find(hitMessages.begin(), hitMessages.end(), message) != hitMessages.end())
