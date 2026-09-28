@@ -1,0 +1,63 @@
+name: Build and test
+
+on:
+  push:
+    branches: [harden/memory-safety]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - name: Check out Deeps
+        uses: actions/checkout@v4
+
+      - name: Check out Ashita 4.30 SDK
+        uses: actions/checkout@v4
+        with:
+          repository: AshitaXI/Ashita-v4beta
+          ref: 2e4b9c86de538ecfedabab918537c550d6378aaa
+          path: ashita-sdk
+
+      - name: Set up MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build packet-safety tests
+        shell: cmd
+        run: >-
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" &&
+          cl /nologo /std:c++20 /W4 /WX /EHsc tests\packet_safety_test.cpp /Fe:packet_safety_test.exe
+
+      - name: Run packet-safety tests
+        shell: cmd
+        run: packet_safety_test.exe
+
+      - name: Build Release Win32 plugin
+        shell: pwsh
+        run: |
+          $sdk = (Resolve-Path "ashita-sdk/plugins/sdk").Path
+          msbuild Deeps.sln /m /p:Configuration=Release /p:Platform=Win32 "/p:AshitaSDK=$sdk"
+
+      - name: Verify DLL architecture and exports
+        shell: cmd
+        run: >-
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat" &&
+          dumpbin /headers release\plugins\Deeps.dll | findstr /C:"machine (x86)" &&
+          dumpbin /exports release\plugins\Deeps.dll | findstr /C:"expGetInterfaceVersion" &&
+          dumpbin /exports release\plugins\Deeps.dll | findstr /C:"expCreatePlugin" &&
+          dumpbin /exports release\plugins\Deeps.dll | findstr /C:"expDestroyPlugin"
+
+      - name: Package plugin
+        shell: pwsh
+        run: Compress-Archive -Path release\plugins,release\resources -DestinationPath Deeps-memory-safe.zip
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Deeps-memory-safe
+          path: Deeps-memory-safe.zip
+          if-no-files-found: error

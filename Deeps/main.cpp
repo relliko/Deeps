@@ -22,6 +22,7 @@
  */
 Deeps::Deeps(void)
     : m_AshitaCore(NULL)
+    , m_LogManager(NULL)
     , m_PluginId(0)
     , m_Direct3DDevice(NULL)
     , m_Debug(false)
@@ -30,9 +31,20 @@ Deeps::Deeps(void)
     , m_PartyOnly(true)
     , m_TVMode(false)
     , m_GUIScale(1)
+    , m_CountSkillchains(true)
+    , m_Background(NULL)
+    , m_CharInfo(0)
+    , m_Drag(false)
+    , m_LastX(0)
+    , m_LastY(0)
+    , m_LastRender(0)
+    , m_StopReport(false)
+    , m_Released(false)
 { }
 Deeps::~Deeps(void)
-{ }
+{
+    Release();
+}
 
 /**
  * @brief Gets the PluginFlags this plugin uses.
@@ -91,6 +103,10 @@ const char* Deeps::GetDescription(void) const
  */
 bool Deeps::Initialize(IAshitaCore* core, ILogManager* log, uint32_t id)
 {
+	if (core == NULL || log == NULL)
+		return false;
+	if (core->GetConfigurationManager() == NULL)
+		return false;
 	this->m_AshitaCore = core;
 	this->m_PluginId = id;
 	this->m_LogManager = log;
@@ -112,13 +128,14 @@ bool Deeps::Initialize(IAshitaCore* core, ILogManager* log, uint32_t id)
  */
 void Deeps::Release(void)
 {
+    if (m_Released)
+        return;
+    m_Released = true;
+    StopReport();
     this->Direct3DRelease();
-
-	while (m_Packets.size() > 0)
-	{
-		free(*m_Packets.begin());
-		m_Packets.pop_front();
-	}
+    m_Packets.Clear();
+    m_AshitaCore = NULL;
+    m_LogManager = NULL;
 }
 
 /**
@@ -131,6 +148,8 @@ void Deeps::Release(void)
  */
 bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
 {
+    if (m_Released || m_AshitaCore == NULL || command == NULL || m_AshitaCore->GetChatManager() == NULL)
+        return false;
     std::vector<std::string> args;
     auto count = Ashita::Commands::GetCommandArgs(command, &args);
     if (count <= 0) return false;
@@ -160,15 +179,27 @@ bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
                         mode = args[2][0];
                         if (count > 3)
                         {
-                            if (std::all_of(args[2].begin(), args[2].end(), ::isdigit))
+                            if (std::all_of(args[3].begin(), args[3].end(), ::isdigit))
                             {
-                                max = atoi(args[2].c_str());
+                                max = atoi(args[3].c_str());
                             }
                         }
                     }
                 }
 
-                std::thread(&Deeps::Report, this, mode, max).detach();
+                std::vector<std::string> lines;
+                if (m_Background != NULL && mode != 0x00)
+                {
+                    lines.push_back(m_Background->GetText());
+                    for (size_t i = 0; i < m_Bars.size() && i < static_cast<size_t>(std::max(0, max)); ++i)
+                    {
+                        if (m_Bars[i] != NULL)
+                            lines.push_back(m_Bars[i]->GetText());
+                    }
+                }
+                StopReport();
+                m_StopReport = false;
+                m_ReportThread = std::thread(&Deeps::Report, this, mode, lines);
 
                 return true;
             }
@@ -247,29 +278,31 @@ bool Deeps::HandleCommand(int32_t mode, const char* command, bool injected)
     return false;
 }
 
-void Deeps::Report(char mode, int max)
+void Deeps::StopReport(void)
 {
-    if (m_Background)
+    m_StopReport = true;
+    m_ReportWake.notify_all();
+    if (m_ReportThread.joinable())
+        m_ReportThread.join();
+}
+
+void Deeps::Report(char mode, std::vector<std::string> lines)
+{
+    IChatManager* chat = m_AshitaCore != NULL ? m_AshitaCore->GetChatManager() : NULL;
+    if (chat == NULL || mode == 0x00)
+        return;
+
+    for (size_t i = 0; i < lines.size(); ++i)
     {
         char buff[256];
-        if (mode != 0x00)
+        if (i != 0)
         {
-            sprintf_s(buff, 256, "/%c %s", mode, m_Background->GetText());
-            m_AshitaCore->GetChatManager()->QueueCommand(1, buff);
+            std::unique_lock<std::mutex> lock(m_ReportMutex);
+            if (m_ReportWake.wait_for(lock, std::chrono::milliseconds(1100), [this]() { return m_StopReport.load(); }))
+                return;
         }
-        for (int i = 0; i < m_Bars.size(); i++)
-        {
-            if (i > max)
-                break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1100));
-
-            IFontObject* bar = m_Bars[i];
-            if ((bar != nullptr) && (mode != 0x00))
-            {
-                sprintf_s(buff, 256, "/%c %s", mode, bar->GetText());
-                m_AshitaCore->GetChatManager()->QueueCommand(1, buff);
-            }
-        }
+        sprintf_s(buff, sizeof(buff), "/%c %s", mode, lines[i].c_str());
+        chat->QueueCommand(1, buff);
     }
 }
 
