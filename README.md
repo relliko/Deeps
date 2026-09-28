@@ -8,6 +8,13 @@ Also thanks to ShiyoKozuki for helping test and helping me figure out some packe
 Forked from https://git.ashitaxi.com/Plugins/Deeps
 
 ## Installation
+Deeps comes as a Lua addon (v2.0 and up) or as the original plugin. Use one or the other, not both: they share the `/dps` and `/deeps` commands.
+
+### Addon
+- Copy the ```addons/deeps``` directory from this repository into the ```addons``` directory of your Ashita v4 install.
+- Type /addon load deeps in game
+
+### Plugin
 - Download and extract the ```plugins``` and ```resources``` directories from the [latest release zip](https://github.com/relliko/Deeps/releases/latest) directly into your base Ashita v4 directory.
 - Type /load deeps in game
 
@@ -21,6 +28,8 @@ Left clicking on a bar will show additional details about the damage dealt, righ
 
 Shift clicking the background will allow you to reposition the window.
 
+`/dps sc player|bar|off` (addon) chooses where skillchain damage goes: into the closer's total, onto its own Skillchain bar, or nowhere. `/dps sc` on its own cycles through them.
+
 
 ## New features
 - Pet damage included in player's damage contribution
@@ -28,7 +37,8 @@ Shift clicking the background will allow you to reposition the window.
 - Damage from outside of party or alliance can now be filtered out
 - Overall hit rating displayed alongside damage done
 
-## Known issues
+## Known issues (plugin)
+The addon fixes all of these except the crit percentage.
 - Settings may not save under certain conditions. To remedy this, change your settings and then `/unload deeps`, it should then save.
 - Additional effects contribute towards overall accuracy
 - The way crit percentage is displayed doesn't account for misses. Thus, your crit rate is going to look lower than it actually is.
@@ -38,6 +48,21 @@ Shift clicking the background will allow you to reposition the window.
 - ~~Missing the first swing of attack rounds may not include the rest of the rounds damage~~ I haven't seen any real evidence of this. If you have it, show me.
 
 ## Patch Notes
+
+### v2.0 (addon)
+- Deeps is now a Lua addon. It looks and works like the plugin: same bars and texture, click to open a bar, right click to go back, shift+drag to move.
+- Spikes, counters and retaliation count for the player (or pet owner) who dealt them.
+- Skillchain damage can have its own bar (`/dps sc bar`), and switching `/dps sc` no longer loses any numbers.
+- Job ability damage counts (Jump, High Jump, Chi Blast, Quick Draw, Weapon Bash, Eagle Eye Shot...), and Jump and High Jump are named correctly instead of Gale Axe and Avalanche Axe.
+- Fixed results being misread after an additional effect or spikes, which could lose the rest of an attack round.
+- Fixed an unrecognized message dropping the rest of a packet.
+- Fixed a Daken shuriken turning the rest of the round's swings into ranged attacks.
+- Fixed long action ids being cut to 10 bits.
+- Additional effect procs no longer raise the hit rate.
+- A pet's damage counts even before its owner does anything, and follows its new owner after a resummon.
+- `/dps report [s/p/l] [#]` sends exactly # bars (4 by default); without s/p/l it only prints them for you.
+- `/dps tvmode` no longer resets the numbers.
+- Every setting is saved: position, TV mode, job colors, party only and skillchains.
 
 ### v1.06
 - Added a configuration setting (`/dps sc`) to disable skillchains counting towards a player's damage contribution.
@@ -62,6 +87,5 @@ Shift clicking the background will allow you to reposition the window.
 - Added a setting to display data from non-party members, toggle by typing /dps partyonly
 
 ## TODO (No guarantees)
-- Config to exclude skillchain damage or display skillchains as their own category
 - Log saving to disk
 - Setting to reset on every kill
