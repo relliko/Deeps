@@ -11,7 +11,7 @@ Forked from https://git.ashitaxi.com/Plugins/Deeps
 Deeps comes as a Lua addon (v2.0 and up) or as the original plugin. Use one or the other, not both: they share the `/dps` and `/deeps` commands.
 
 ### Addon
-- Copy the ```addons/deeps``` directory from this repository into the ```addons``` directory of your Ashita v4 install.
+- Download the addon zip from the [latest release](https://github.com/relliko/Deeps/releases/latest) and extract it into your Ashita v4 directory (it contains ```addons/deeps```), or copy the ```addons/deeps``` directory from this repository into the ```addons``` directory of your Ashita v4 install.
 - Type /addon load deeps in game
 
 ### Plugin
@@ -27,6 +27,8 @@ You can type /dps or /deeps to show the available commands.
 Left clicking on a bar will show additional details about the damage dealt, right click to go back.
 
 Shift clicking the background will allow you to reposition the window.
+
+The - at the right of the title bar (addon) minimizes the meter to an icon at the bottom right of the screen; click the icon, or type `/dps show`, to bring it back. `/dps min` minimizes it too.
 
 `/dps sc player|bar|off` (addon) chooses where skillchain damage goes: into the closer's total, onto its own Skillchain bar, or nowhere. `/dps sc` on its own cycles through them.
 
@@ -48,6 +50,10 @@ The addon fixes all of these except the crit percentage.
 - ~~Missing the first swing of attack rounds may not include the rest of the rounds damage~~ I haven't seen any real evidence of this. If you have it, show me.
 
 ## Patch Notes
+
+### v2.1.1 (addon)
+- The meter can be minimized to an icon at the bottom right of the screen, with the - in its title bar or `/dps min`. Click the icon or type `/dps show` to bring it back. It stays minimized through a reload.
+- The icon sits in one row with the minimized windows of other addons that use the same tray (allrecipes, droptables).
 
 ### v2.0 (addon)
 - Deeps is now a Lua addon. It looks and works like the plugin: same bars and texture, click to open a bar, right click to go back, shift+drag to move.

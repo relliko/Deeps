@@ -3,12 +3,14 @@
 * Originally a plugin by kjLotus, updated by Relliko; ported from the Deeps plugin (v1.06).
 *
 * Reads action packets to add up everyone's damage, and draws it as bars. Left click a bar for
-* where the damage came from, right click to go back, shift+drag to move it. /dps for commands.
+* where the damage came from, right click to go back, shift+drag to move it. The - in its title
+* bar minimizes it to an icon in the tray at the bottom right (tray.lua); click that to bring it
+* back. /dps for commands.
 --]]
 
 addon.name    = 'deeps';
 addon.author  = 'Relliko, kjLotus';
-addon.version = '2.0';
+addon.version = '2.1.1';
 addon.desc    = 'Damage meters for Ashita v4.';
 addon.link    = 'https://github.com/relliko/Deeps';
 
@@ -17,6 +19,7 @@ local chat     = require('chat');
 local settings = require('settings');
 local damage   = require('damage');
 local render   = require('render');
+local tray     = require('tray');
 
 local defaults = T{
     x         = 300,
@@ -26,6 +29,20 @@ local defaults = T{
     partyonly = true,      -- only party and alliance members
     sc        = 'player',  -- skillchain damage: 'player' (the closer's), 'bar' (its own bar) or 'off'
     maxbars   = 15,
+    minimized = false,     -- shown as an icon at the bottom right (tray.lua) instead
+};
+
+-- The minimized meter's icon: three bars, longest first, in a teal like the bars'.
+local ICON = {
+    tip = 'Deeps: click to open',
+    panel = 0xE0000000, edge = 0xC8808080, hot_panel = 0xF0202020, hot_edge = 0xFF8CBE28,
+    glyph = function (dl, x, y, w, h)
+        local x0, bh = x + w * 0.22, h * 0.14;
+        for i, len in ipairs({ 0.56, 0.4, 0.26 }) do
+            local top = y + h * (0.16 + 0.26 * (i - 1));
+            dl:AddRectFilled({ x0, top }, { x0 + w * len, top + bh }, 0xFF8CBE28);
+        end
+    end,
 };
 
 local deeps = {
@@ -65,6 +82,14 @@ local function help()
     help_line('/dps partyonly', ' - Toggle displaying data from non-party members.');
     help_line('/dps tvmode', ' - Scales Deeps up to a size that works better on large displays.');
     help_line('/dps sc [player|bar|off]', ' - Skillchain damage: counted for the closer, shown as its own bar, or left out.');
+    help_line('/dps min', ' - Minimize the meter to an icon at the bottom right (so does the - in its title bar).');
+    help_line('/dps show', ' - Bring the meter back (so does clicking its icon).');
+end
+
+local function minimize(on)
+    deeps.settings.minimized = on;
+    render.hide(on);
+    save();
 end
 
 --[[
@@ -119,9 +144,11 @@ end
 ashita.events.register('load', 'deeps_load', function ()
     deeps.settings = settings.load(defaults);
     render.init(deeps.settings, addon.path .. 'bar.tga');
+    tray.init('deeps');
 end);
 
 ashita.events.register('unload', 'deeps_unload', function ()
+    tray.hide('deeps');
     save();
     render.release();
 end);
@@ -152,6 +179,10 @@ ashita.events.register('command', 'deeps_command', function (e)
         reset();
     elseif (what == 'report') then
         report(args);
+    elseif (what == 'min') then
+        minimize(true);
+    elseif (what == 'show') then
+        minimize(false);
     elseif (what == 'debug') then
         damage.debug = not damage.debug;
         msg(damage.debug and 'Debug Enabled' or 'Debug Disabled');
@@ -200,7 +231,21 @@ ashita.events.register('packet_in', 'deeps_packet_in', function (e)
 end);
 
 ashita.events.register('d3d_present', 'deeps_present', function ()
+    if (deeps.settings.minimized) then
+        render.hide(true);
+        if (tray.icon('deeps', ICON)) then
+            minimize(false);
+        end
+        return;
+    end
+    tray.hide('deeps');
+    render.hide(false);
     render.update();
+    render.draw_min();
+    if (render.minimize) then
+        render.minimize = false;
+        minimize(true);
+    end
     if (render.moved) then
         render.moved = false;
         save();

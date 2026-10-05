@@ -2,12 +2,14 @@
 * Deeps - render
 * The meter: a background font with a title, and one font per bar, drawn by Ashita like the
 * plugin's. Three views: everyone's damage, one player's sources, and one source's results.
-* Left click a bar to open it, right click to go back, shift+drag to move it.
+* Left click a bar to open it, right click to go back, shift+drag to move it. The - at the right
+* of the title bar minimizes it (deeps.lua puts its icon in the tray at the bottom right).
 --]]
 
 require('common');
 local ffi     = require('ffi');
 local fonts   = require('fonts');
+local imgui   = require('imgui');
 local defines = require('defines');
 local damage  = require('damage');
 
@@ -29,6 +31,9 @@ local render = {
     last_y  = 0,
     last    = -1,    -- when the bars were last updated
     moved   = false, -- the position changed and should be saved
+    hidden  = false, -- minimized: the meter isn't drawn and takes no clicks
+    min_hot = false, -- the mouse is on the -
+    minimize = false, -- the - was clicked
     texture = nil,   -- bar.tga
     now     = os.clock,
     shift   = function () return bit.band(ffi.C.GetKeyState(0x10), 0x8000) ~= 0; end,
@@ -45,6 +50,7 @@ end
 --]]
 function render.init(s, texture)
     render.s, render.texture = s, texture;
+    render.hidden, render.min_hot, render.minimize = false, false, false;
     local k = scale();
     render.bg = fonts.new({
         visible     = true,
@@ -320,10 +326,52 @@ local function results_view()
 end
 
 --[[
+* Shows or hides the meter (minimized).
+--]]
+function render.hide(hidden)
+    if (render.bg == nil or render.hidden == hidden) then
+        return;
+    end
+    render.hidden, render.min_hot, render.drag = hidden, false, false;
+    render.bg.visible = not hidden;
+    for _, bar in ipairs(render.bars) do
+        bar.visible = not hidden;
+    end
+    render.last = -1;
+end
+
+-- The - that minimizes the meter: a square at the right end of the title bar, on screen.
+function render.min_rect()
+    local k = scale();
+    local side = (D.TITLEBAR_HEIGHT - 3) * k;
+    local x1, y0 = render.bg.position_x + D.WINDOW_WIDTH * k - 2 * k, render.bg.position_y + 1.5 * k;
+    return x1 - side, y0, x1, y0 + side;
+end
+
+local function on_min(x, y)
+    local x0, y0, x1, y1 = render.min_rect();
+    return x >= x0 and x < x1 and y >= y0 and y < y1;
+end
+
+-- Draws the - (over the title bar, with ImGui like the other addons' -), lit under the mouse.
+function render.draw_min()
+    if (render.bg == nil or render.hidden) then
+        return;
+    end
+    local x0, y0, x1, y1 = render.min_rect();
+    local dl = imgui.GetForegroundDrawList();
+    if (render.min_hot) then
+        dl:AddRectFilled({ x0, y0 }, { x1, y1 }, 0x50FFFFFF);
+    end
+    local cx, cy, e = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.28;
+    dl:AddLine({ cx - e, cy }, { cx + e, cy }, render.min_hot and 0xFFFFFFFF or 0xC8FFFFFF, 1.5 * scale());
+end
+
+--[[
 * Updates the bars (at most every 0.1 s), from d3d_present.
 --]]
 function render.update()
-    if (render.bg == nil) then
+    if (render.bg == nil or render.hidden) then
         return;
     end
     local t = render.now();
@@ -373,7 +421,7 @@ end
 * the meter, and the end of a drag.
 --]]
 function render.mouse(msg, x, y)
-    if (render.bg == nil) then
+    if (render.bg == nil or render.hidden) then
         return false;
     end
     if (render.drag) then
@@ -386,6 +434,15 @@ function render.mouse(msg, x, y)
             render.moved = true;
             return true;
         end
+    end
+
+    -- The -: lit under the mouse; a click on it minimizes the meter.
+    render.min_hot = on_min(x, y);
+    if (render.min_hot and not render.drag) then
+        if (msg == 514) then
+            render.minimize = true;
+        end
+        return msg == 513 or msg == 514;
     end
 
     if (msg == 513 and render.shift() and hit_window(x, y)) then
