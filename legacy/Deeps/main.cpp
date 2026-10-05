@@ -65,7 +65,7 @@ double Deeps::GetVersion(void) const
  */
 const char* Deeps::GetAuthor(void) const
 {
-    return "relli, kjLotus";
+    return "Relli, kjLotus";
 }
 
 /**
