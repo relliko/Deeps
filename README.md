@@ -39,6 +39,9 @@ Deeps started as a C++ plugin (v1.x). It is no longer maintained: the addon abov
 
 ## Patch Notes
 
+### v2.2.1
+- The meter can no longer get lost off the screen: if its title bar is off-screen (dragged out, or saved at a bigger resolution), it's pulled back on and the new position is saved.
+
 ### v2.2
 - The Lua addon is now the only maintained version of Deeps. The old plugin is deprecated and its code moved to `legacy/`.
 

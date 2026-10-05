@@ -368,6 +368,28 @@ function render.draw_min()
 end
 
 --[[
+* Pulls the title bar back onto the screen when it's off it (dragged out, or saved at a bigger
+* resolution), so the meter can't be lost; the new position is saved.
+--]]
+function render.keep_on_screen(k)
+    if (render.drag) then
+        return;
+    end
+    local screen = imgui.GetIO().DisplaySize;
+    if (screen == nil or screen.x <= 0 or screen.y <= 0) then
+        return;
+    end
+    local w, h = D.WINDOW_WIDTH * k, D.TITLEBAR_HEIGHT * k;
+    local x = math.max(0, math.min(render.bg.position_x, screen.x - w));
+    local y = math.max(0, math.min(render.bg.position_y, screen.y - h));
+    if (x ~= render.bg.position_x or y ~= render.bg.position_y) then
+        render.bg.position_x, render.bg.position_y = x, y;
+        render.s.x, render.s.y = x, y;
+        render.moved = true;
+    end
+end
+
+--[[
 * Updates the bars (at most every 0.1 s), from d3d_present.
 --]]
 function render.update()
@@ -379,6 +401,7 @@ function render.update()
         return;
     end
     local k = scale();
+    render.keep_on_screen(k);
     render.bg.font_height = D.TITLE_FONT_HEIGHT * k;
     local bgb = render.bg.background;
     bgb.width = D.WINDOW_WIDTH * k;
