@@ -10,7 +10,7 @@
 
 addon.name    = 'deeps';
 addon.author  = 'Relliko, kjLotus';
-addon.version = '2.1.1';
+addon.version = '2.2';
 addon.desc    = 'Damage meters for Ashita v4.';
 addon.link    = 'https://github.com/relliko/Deeps';
 

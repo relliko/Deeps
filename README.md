@@ -1,4 +1,7 @@
 # Deeps for Ashita v4
+A damage meter addon for Ashita v4: one bar per player with their share of the damage, click a bar to see where the damage came from.
+
+## Credits
 Credit to kjLotus for the original version of Deeps that was the basis for this update.
 
 Special thanks to Thorny for help with refactoring and general advice and tips on Ashita development!
@@ -8,54 +11,42 @@ Also thanks to ShiyoKozuki for helping test and helping me figure out some packe
 Forked from https://git.ashitaxi.com/Plugins/Deeps
 
 ## Installation
-Deeps comes as a Lua addon (v2.0 and up) or as the original plugin. Use one or the other, not both: they share the `/dps` and `/deeps` commands.
+- Download the zip from the [latest release](https://github.com/relliko/Deeps/releases/latest) and extract it into your Ashita v4 directory (it contains `addons/deeps`; if playing on Horizon this is the `Game\` directory). Or copy the `addons/deeps` directory from this repository into the `addons` directory of your Ashita v4 install.
+- Type `/addon load deeps` in game.
 
-### Addon
-- Download the addon zip from the [latest release](https://github.com/relliko/Deeps/releases/latest) and extract it into your Ashita v4 directory (it contains ```addons/deeps```), or copy the ```addons/deeps``` directory from this repository into the ```addons``` directory of your Ashita v4 install.
-- Type /addon load deeps in game
-
-### Plugin
-- Download and extract the ```plugins``` and ```resources``` directories from the [latest release zip](https://github.com/relliko/Deeps/releases/latest) directly into your base Ashita v4 directory.
-- Type /load deeps in game
-
-Note: The only necessarily required file is ```plugins/Deeps.dll```; if you don't like the bar texture you can leave out the resources folder and just have flat colored bars and the plugin will still work, although some jobs may have text that is difficult to read.
-
+If you used the old Deeps plugin, `/unload deeps` and remove it from your scripts first: they share the `/dps` and `/deeps` commands.
 
 ## Usage
-You can type /dps or /deeps to show the available commands. 
+Type `/dps` or `/deeps` to show the available commands.
 
-Left clicking on a bar will show additional details about the damage dealt, right click to go back.
+- Left click a bar to see more about the damage dealt, right click to go back.
+- Shift+drag the background to move the window.
+- The - at the right of the title bar minimizes the meter to an icon at the bottom right of the screen; click the icon, or type `/dps show`, to bring it back. `/dps min` minimizes it too.
+- `/dps sc player|bar|off` chooses where skillchain damage goes: into the closer's total, onto its own Skillchain bar, or nowhere. `/dps sc` on its own cycles through them.
 
-Shift clicking the background will allow you to reposition the window.
-
-The - at the right of the title bar (addon) minimizes the meter to an icon at the bottom right of the screen; click the icon, or type `/dps show`, to bring it back. `/dps min` minimizes it too.
-
-`/dps sc player|bar|off` (addon) chooses where skillchain damage goes: into the closer's total, onto its own Skillchain bar, or nowhere. `/dps sc` on its own cycles through them.
-
-
-## New features
-- Pet damage included in player's damage contribution
+## Features
+- Pet damage included in the owner's damage contribution
 - Static colors for job bars
-- Damage from outside of party or alliance can now be filtered out
+- Damage from outside of party or alliance can be filtered out
 - Overall hit rating displayed alongside damage done
+- Spikes, counters, retaliation, skillchains and job ability damage all count
 
-## Known issues (plugin)
-The addon fixes all of these except the crit percentage.
-- Settings may not save under certain conditions. To remedy this, change your settings and then `/unload deeps`, it should then save.
-- Additional effects contribute towards overall accuracy
-- The way crit percentage is displayed doesn't account for misses. Thus, your crit rate is going to look lower than it actually is.
-- Spikes damage, counters, reprisal procs do not count currently.
-- High jump displays as Avalanche and Jump displays as Gale axe
-- Report only shows top 4
-- ~~Missing the first swing of attack rounds may not include the rest of the rounds damage~~ I haven't seen any real evidence of this. If you have it, show me.
+## Known issues
+- The way crit percentage is displayed doesn't account for misses, so your crit rate will look lower than it actually is.
+
+## Legacy plugin (deprecated)
+Deeps started as a C++ plugin (v1.x). It is no longer maintained: the addon above replaces it and fixes its known issues. Its source and last build are kept in [`legacy/`](legacy) for reference, and the plugin downloads stay on the [v1.06 release](https://github.com/relliko/Deeps/releases/tag/v1.06).
 
 ## Patch Notes
 
-### v2.1.1 (addon)
+### v2.2
+- The Lua addon is now the only maintained version of Deeps. The old plugin is deprecated and its code moved to `legacy/`.
+
+### v2.1.1
 - The meter can be minimized to an icon at the bottom right of the screen, with the - in its title bar or `/dps min`. Click the icon or type `/dps show` to bring it back. It stays minimized through a reload.
 - The icon sits in one row with the minimized windows of other addons that use the same tray (allrecipes, droptables).
 
-### v2.0 (addon)
+### v2.0
 - Deeps is now a Lua addon. It looks and works like the plugin: same bars and texture, click to open a bar, right click to go back, shift+drag to move.
 - Spikes, counters and retaliation count for the player (or pet owner) who dealt them.
 - Skillchain damage can have its own bar (`/dps sc bar`), and switching `/dps sc` no longer loses any numbers.
@@ -70,24 +61,24 @@ The addon fixes all of these except the crit percentage.
 - `/dps tvmode` no longer resets the numbers.
 - Every setting is saved: position, TV mode, job colors, party only and skillchains.
 
-### v1.06
+### v1.06 (plugin)
 - Added a configuration setting (`/dps sc`) to disable skillchains counting towards a player's damage contribution.
 - Hopefully fixed pet damage ending up associated with the wrong owner after resummoning.
 - Fixed colors being random when someone is /anon, now it is consistently blue.
 - Spells no longer affect overall hit rate
 
-### v1.05
+### v1.05 (plugin)
 - Fixed SMN blood pacts not being included in pet damage
 - Added /dps tvmode to scale the size up by 50% so it's easier to look at on big screens.
 
-### v1.04
+### v1.04 (plugin)
 - Fix for crash while clicking bars
 
-### v1.03
+### v1.03 (plugin)
 - Stability fixes
 - Improved visibility of DRK bars
 
-### v1.02
+### v1.02 (plugin)
 - Pet damage now counts towards a player's total damage contribution. It should not affect the displayed overall hit rate
 - Added a setting to toggle static job colors, typing /dps jobcolors will bring back randomized coloring for jobs
 - Added a setting to display data from non-party members, toggle by typing /dps partyonly
