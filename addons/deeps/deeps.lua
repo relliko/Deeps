@@ -1,6 +1,6 @@
 --[[
 * Deeps - damage meters for Ashita v4, as a Lua addon.
-* Originally a plugin by kjLotus, updated by Relliko; ported from the Deeps plugin (v1.06).
+* Originally a plugin by kjLotus, updated by relli; ported from the Deeps plugin (v1.06).
 *
 * Reads action packets to add up everyone's damage, and draws it as bars. Left click a bar for
 * where the damage came from, right click to go back, shift+drag to move it. The - in its title
@@ -9,7 +9,7 @@
 --]]
 
 addon.name    = 'deeps';
-addon.author  = 'Relliko, kjLotus';
+addon.author  = 'relli, kjLotus';
 addon.version = '2.2.1';
 addon.desc    = 'Damage meters for Ashita v4.';
 addon.link    = 'https://github.com/relliko/Deeps';
